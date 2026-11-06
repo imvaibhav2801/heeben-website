@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Heeben — We Care Beyond the Drive</title>
+<meta name="description" content="Heeben brings vehicle care services and local garages together.">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<header class="topbar">
+  <a class="brand" href="#" data-view="home">heeben<span>.</span></a>
+  <button class="mobile-menu" id="mobileMenu" aria-label="Toggle menu">☰</button>
+  <nav id="mainNav">
+    <button class="nav-link active" data-view="home">Home</button>
+    <button class="nav-link" data-view="services">Services</button>
+    <button class="nav-link" data-view="garages">Find a garage</button>
+    <button class="nav-link" data-view="bookings">My bookings</button>
+    <button class="nav-link" data-view="garage">Garage dashboard</button>
+  </nav>
+  <div class="header-actions"><button class="btn btn-outline" id="loginBtn">Log in</button><button class="btn btn-navy" id="signupBtn">Get started</button></div>
+</header>
+<main id="app">
+<section class="view active" id="home">
+  <div class="hero">
+    <div class="hero-copy">
+      <p class="eyebrow">VEHICLE CARE, MADE SIMPLE</p>
+      <h1>Every ride deserves<br><em>better care.</em></h1>
+      <p class="lead">From everyday maintenance to unexpected repairs, discover local vehicle-care professionals and arrange the service that works for you.</p>
+      <div class="actions"><button class="btn btn-navy btn-large" data-go="services">Explore services ↗</button><button class="btn btn-text" data-go="how">How Heeben works →</button></div>
+      <div class="trust"><span></span> A simpler way to care for every ride</div>
+    </div>
+    <div class="hero-photo"><img src="https://images.unsplash.com/photo-1486262715619-67b85e0b08d3?auto=format&fit=crop&w=1200&q=85" alt="Mechanic inspecting a vehicle"><div class="photo-caption"><b>Care that goes further</b><small>One place for your vehicle needs</small></div></div>
+  </div>
+  <section class="section intro-grid"><div><p class="eyebrow">WELCOME TO HEEBEN</p><h2>Good care keeps<br>you moving.</h2></div><p class="muted">Finding dependable vehicle care shouldn't feel like another chore. Heeben brings services and local garages together, helping you make confident choices for the journeys ahead.</p></section>
+  <section class="section"><div class="section-heading"><div><p class="eyebrow">START WITH WHAT YOU NEED</p><h2>Care for every kind<br>of journey.</h2></div><button class="btn btn-text" data-go="services">View all services →</button></div><div class="tiles">
+    <button class="tile" data-service="Cleaning & detailing"><span>01 / CLEAN</span><i>✧</i><b>Cleaning & detailing</b><small>Give your vehicle the refresh it deserves.</small></button>
+    <button class="tile" data-service="Routine servicing"><span>02 / MAINTAIN</span><i>◷</i><b>Routine servicing</b><small>Stay ahead with regular maintenance.</small></button>
+    <button class="tile" data-service="Mechanical repairs"><span>03 / REPAIR</span><i>⌁</i><b>Mechanical repairs</b><small>Get help with the fixes that keep you moving.</small></button>
+    <button class="tile" data-service="Tyres & batteries"><span>04 / ESSENTIALS</span><i>◉</i><b>Tyres & batteries</b><small>Look after the essentials of your ride.</small></button>
+  </div></section>
+  <section class="vehicle-strip"><div><p class="eyebrow">ONE PLATFORM. EVERY RIDE.</p><h2>Made for the way<br>India moves.</h2><p>Two wheels, four wheels, petrol or electric — your vehicle deserves thoughtful care.</p><button class="btn btn-light" data-go="garages">Find a service provider ↗</button></div><div class="vehicle-list"><p>01 <b>Two-wheelers</b></p><p>02 <b>Cars</b></p><p>03 <b>Electric vehicles</b></p><p>04 <b>Commercial vehicles</b></p></div></section>
+  <section class="section cta-center"><p class="eyebrow">YOUR NEXT RIDE STARTS HERE</p><h2>Let's make vehicle care<br><em>feel effortless.</em></h2><button class="btn btn-navy btn-large" data-go="services">Get started ↗</button></section>
+</section>
+
+<section class="view" id="services">
+  <div class="page-head"><p class="eyebrow">THE HEEBEN SERVICE LIST</p><h1>Everything your ride<br><em>needs to keep going.</em></h1><p>Choose your vehicle and explore the services you're looking for.</p></div>
+  <div class="section service-layout"><div class="panel"><h3>1. Select your vehicle</h3><div class="vehicle-select" id="vehicleSelect"><button class="vehicle-option selected" data-vehicle="Car">🚗<b>Car</b></button><button class="vehicle-option" data-vehicle="Two-wheeler">🏍️<b>Two-wheeler</b></button><button class="vehicle-option" data-vehicle="Electric vehicle">⚡<b>Electric</b></button><button class="vehicle-option" data-vehicle="Commercial vehicle">🚚<b>Commercial</b></button></div><label class="field">Vehicle nickname / model<input id="vehicleModel" placeholder="e.g. Honda City, Activa 6G"></label><button class="btn btn-navy" id="saveVehicle">Save vehicle</button><p class="hint" id="vehicleStatus">Select a vehicle type to continue.</p></div>
+  <div><h3 class="section-subtitle">2. Choose a service</h3><div class="service-catalog" id="serviceCatalog"></div></div></div>
+</section>
+
+<section class="view" id="garages">
+  <div class="page-head"><p class="eyebrow">LOCAL VEHICLE-CARE PROFESSIONALS</p><h1>Find a garage<br><em>you can count on.</em></h1><p>Explore demo listings and filter by service or vehicle type.</p></div>
+  <div class="section"><div class="filterbar"><input id="garageSearch" placeholder="Search garage or area..."><select id="garageService"><option value="">All services</option><option>Cleaning & detailing</option><option>Routine servicing</option><option>Mechanical repairs</option><option>Tyres & batteries</option><option>Electrical & EV care</option></select><select id="garageVehicle"><option value="">All vehicles</option><option>Car</option><option>Two-wheeler</option><option>Electric vehicle</option><option>Commercial vehicle</option></select></div><div class="garage-grid" id="garageGrid"></div><p class="hint">Demo garage listings only. These are sample businesses, not verified or bookable real-world providers.</p></div>
+</section>
+
+<section class="view" id="bookings">
+  <div class="page-head compact"><p class="eyebrow">YOUR VEHICLE CARE ACTIVITY</p><h1>My bookings.</h1><p>Review your demo appointments and payment status.</p></div>
+  <div class="section"><div class="dashboard-top"><div><h2>Your appointments</h2><p class="muted">Bookings created in this browser appear here.</p></div><button class="btn btn-navy" data-go="garages">Find a garage ↗</button></div><div id="bookingList" class="booking-list"></div>
+  <div class="panel reminder-panel"><div><p class="eyebrow">DON'T MISS A CHECK-UP</p><h3>Service reminders</h3><p class="muted">Add a reminder for your next routine check.</p></div><form id="reminderForm" class="inline-form"><input required id="reminderText" placeholder="e.g. Oil change"><input required type="date" id="reminderDate"><button class="btn btn-navy">Add reminder</button></form><div id="reminderList" class="reminders"></div></div></div>
+</section>
+
+<section class="view" id="garage">
+  <div class="page-head compact"><p class="eyebrow">HEEBEN FOR SERVICE PARTNERS</p><h1>Garage dashboard.</h1><p>Register a sample garage and manage incoming demo bookings.</p></div>
+  <div class="section dashboard-grid"><div class="panel"><p class="eyebrow">PARTNER REGISTRATION</p><h2>List your garage.</h2><form id="garageForm" class="stack-form"><label class="field">Garage name<input required id="partnerName" placeholder="Your garage name"></label><label class="field">Area / city<input required id="partnerArea" placeholder="e.g. Indiranagar, Bengaluru"></label><label class="field">Services offered<select id="partnerService"><option>Routine servicing</option><option>Cleaning & detailing</option><option>Mechanical repairs</option><option>Tyres & batteries</option><option>Electrical & EV care</option></select></label><label class="field">Contact number<input required id="partnerPhone" type="tel" placeholder="Your phone number"></label><button class="btn btn-navy">Register garage</button><p class="hint" id="partnerStatus"></p></form></div>
+  <div class="panel"><p class="eyebrow">BOOKING MANAGEMENT</p><h2>Incoming requests.</h2><div id="partnerBookings" class="booking-list"></div><p class="hint">This demo dashboard lets you change request status locally. It is not connected to real customers.</p></div></div>
+</section>
+
+<section class="view" id="how">
+  <div class="page-head"><p class="eyebrow">A BETTER WAY TO GET IT DONE</p><h1>Vehicle care,<br><em>without the runaround.</em></h1><p>Our goal is to make discovering and arranging vehicle services feel clear and convenient.</p></div>
+  <div class="section steps"><article><b>01</b><div><h2>Choose what you need</h2><p>Start with your vehicle type and the service you're looking for.</p></div></article><article><b>02</b><div><h2>Explore local options</h2><p>Compare relevant garages and service providers around your area.</p></div></article><article><b>03</b><div><h2>Pick a convenient option</h2><p>Choose a suitable time and whether you'd prefer pickup or to visit the garage, where available.</p></div></article><article><b>04</b><div><h2>Track and review</h2><p>Keep an eye on your booking and share feedback after service.</p></div></article></div>
+</section>
+</main>
+<footer><a class="brand" href="#" data-view="home">heeben<span>.</span></a><p>We Care Beyond the Drive.</p><div><button data-go="services">Services</button><button data-go="garages">Find a garage</button><button data-go="partners">Partner with us</button><button data-go="contact">Contact</button></div><small>© 2026 Heeben. Local demo prototype.</small></footer>
+
+<div class="modal-backdrop" id="authModal"><div class="modal"><button class="modal-close" data-close>×</button><p class="eyebrow">WELCOME TO HEEBEN</p><h2 id="authTitle">Create your account.</h2><form id="authForm" class="stack-form"><label class="field">Full name<input required id="authName" placeholder="Your name"></label><label class="field">Email<input required type="email" id="authEmail" placeholder="you@example.com"></label><label class="field">Password<input required type="password" id="authPassword" minlength="6" placeholder="At least 6 characters"></label><button class="btn btn-navy" id="authSubmit">Create account</button><p class="hint" id="authMessage"></p></form><button class="switch-auth" id="switchAuth">Already have an account? Log in</button></div></div>
+
+<div class="modal-backdrop" id="bookingModal"><div class="modal wide"><button class="modal-close" data-close>×</button><p class="eyebrow">BOOK A SERVICE</p><h2 id="bookingTitle">Complete your booking.</h2><form id="bookingForm" class="stack-form"><div class="two-fields"><label class="field">Your vehicle<input id="bookingVehicle" required placeholder="e.g. Honda City"></label><label class="field">Service<input id="bookingService" required readonly></label></div><div class="two-fields"><label class="field">Date<input id="bookingDate" type="date" required></label><label class="field">Preferred time<select id="bookingTime"><option>09:00 AM</option><option>11:00 AM</option><option>02:00 PM</option><option>04:00 PM</option></select></label></div><label class="field">Service option<select id="bookingMode"><option>Visit garage</option><option>Pickup requested (subject to availability)</option></select></label><label class="field">Payment method<select id="paymentMethod"><option>Pay at garage</option><option>Online payment (demo only)</option></select></label><button class="btn btn-navy">Confirm demo booking</button><p class="hint">No real payment will be collected. Online payment is simulated for this prototype.</p></form></div></div>
+
+<div class="modal-backdrop" id="reviewModal"><div class="modal"><button class="modal-close" data-close>×</button><p class="eyebrow">SHARE YOUR EXPERIENCE</p><h2>Leave a review.</h2><form id="reviewForm" class="stack-form"><input type="hidden" id="reviewBookingId"><label class="field">Rating<select id="reviewRating"><option value="5">★★★★★ — Excellent</option><option value="4">★★★★ — Good</option><option value="3">★★★ — Okay</option><option value="2">★★ — Poor</option><option value="1">★ — Very poor</option></select></label><label class="field">Your feedback<textarea id="reviewText" rows="3" placeholder="How was your experience?"></textarea></label><button class="btn btn-navy">Submit review</button></form></div></div>
+
+<div class="toast" id="toast" role="status"></div>
+<script src="app.js"></script>
+</body></html>
