@@ -5,6 +5,7 @@
 <title>Heeben — We Care Beyond the Drive</title>
 <meta name="description" content="Heeben brings vehicle care services and local garages together.">
 <link rel="stylesheet" href="styles.css">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
 </head>
 <body>
 <a class="skip" href="#main">Skip to content</a>
@@ -105,8 +106,8 @@
 </section>
 
 <section class="view" id="services">
-  <div class="page-head"><p class="eyebrow">THE HEEBEN SERVICE LIST</p><h1>Everything your ride<br><em>needs to keep going.</em></h1><p>Choose your vehicle type, then pick the service you need.</p></div>
-  <div class="section"><div class="vehicle-select" id="vehicleSelect" role="group" aria-label="Vehicle type"></div><div class="service-catalog" id="serviceCatalog"></div></div>
+  <div class="page-head"><p class="eyebrow">THE HEEBEN SERVICE MENU</p><h1>Available services.<br><em>Know the estimate before you go.</em></h1><p>Explore common car and two-wheeler services with indicative price ranges and typical workshop time.</p></div>
+  <div class="section"><div class="service-guide-tools"><div class="vehicle-select" id="vehicleSelect" role="group" aria-label="Vehicle type"></div><input id="serviceGuideSearch" type="search" placeholder="Search a service — e.g. brake, oil, battery" aria-label="Search available services"></div><div class="service-guide-note"><b>Indicative estimates only.</b> Actual price and completion time depend on vehicle model, parts, condition and garage. Confirm the final quote and slot with your chosen garage.</div><div class="service-catalog" id="serviceCatalog"></div></div>
 </section>
 
 <section class="view" id="prices">
@@ -119,7 +120,8 @@
 <section class="view" id="garages">
   <div class="page-head"><p class="eyebrow">LOCAL VEHICLE-CARE PROFESSIONALS</p><h1>Find a garage<br><em>you can count on.</em></h1><p>Search by area, service or vehicle, then send a booking request.</p></div>
   <div class="section"><div class="filterbar"><input id="garageSearch" placeholder="Search garage or area..." aria-label="Search garages"><select id="garageService" aria-label="Service"><option value="">All services</option></select><select id="garageVehicle" aria-label="Vehicle"><option value="">All vehicles</option></select><select id="garageSort" aria-label="Sort garages"><option value="recommended">Recommended</option><option value="rating">Highest rated</option><option value="price">Lowest starting price</option><option value="distance">Nearest first</option></select></div>
-  <div class="near-bar"><button class="btn btn-navy" id="nearMeBtn" type="button">◎ Garages near me</button><select id="garageRadius" aria-label="Distance"><option value="">Any distance</option><option value="3">Within 3 km</option><option value="5">Within 5 km</option><option value="10">Within 10 km</option><option value="25">Within 25 km</option></select><span class="hint" id="nearStatus" aria-live="polite"></span></div>
+  <div class="near-bar"><button class="btn btn-navy" id="nearMeBtn" type="button">◎ Garages near me</button><select id="garageRadius" aria-label="Distance"><option value="">Any distance</option><option value="3">Within 3 km</option><option value="5">Within 5 km</option><option value="10" selected>Within 10 km</option><option value="25">Within 25 km</option></select><span class="hint" id="nearStatus" aria-live="polite"></span></div>
+  <section class="garage-map-panel" aria-label="Nearby garage map"><div class="map-panel-head"><div><p class="eyebrow">EXPLORE ANYWHERE</p><h2>Find garages by location</h2><p class="hint" id="mapStatus">Search a city, area or PIN code, or use your current location.</p></div><button class="btn btn-outline" id="mapLocateBtn" type="button">◎ Use my location</button></div><div class="map-location-search"><input id="mapLocationSearch" type="search" placeholder="Enter area, city or PIN code — e.g. Koramangala, Bengaluru" aria-label="Search garages around a location"><button class="btn btn-navy" id="mapLocationSearchBtn" type="button">Search this location ↗</button></div><div class="map-legend"><span><i class="legend-dot partner"></i> Heeben partners</span><span><i class="legend-dot nearby"></i> Other nearby garages</span><span><i class="legend-dot you"></i> Your location</span></div><div id="garageMap" role="application" aria-label="Map showing Heeben partners and nearby garages"></div><div id="nearbyGarageLinks" class="nearby-garage-links" aria-live="polite"></div><p class="map-footnote">Nearby independent garage data is sourced from OpenStreetMap and may be incomplete. Directions open in Google Maps.</p></section>
   <p class="hint garage-notice" id="garageNotice" hidden>Showing sample garages only: the Heeben server can't be reached from here, so booking and login are unavailable until it is running.</p>
   <p class="hint" id="garageCount" aria-live="polite"></p><div class="garage-grid" id="garageGrid"></div></div>
 </section>
@@ -190,6 +192,7 @@
 
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 <script src="prices.js"></script>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
 <script src="fallback.js"></script>
 <script src="app.js"></script>
 </body></html>

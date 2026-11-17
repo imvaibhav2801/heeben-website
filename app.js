@@ -159,10 +159,107 @@ async function loadGarages() {
     if (id !== garageReq) return;
     $('#nearStatus').textContent = userCoords ? (coordsSource === 'gps' ? 'Distances are from your current location.' : 'Distances are from the area you searched.') : ($('#garageRadius').value ? 'Tap "Garages near me" so we can filter by distance.' : '');
     $('#garageNotice').hidden = !usingFallback;
-    $('#garageCount').textContent = list.length ? `${list.length} garage${list.length > 1 ? 's' : ''} found` : '';
+    $('#garageCount').textContent = list.length ? `${list.length} Heeben garage${list.length > 1 ? 's' : ''} found` : '';
     grid.innerHTML = list.length ? list.map(g => garageCard(g)).join('') : `<div class="empty-shortlist">${userCoords && $('#garageRadius').value ? `No garages within ${$('#garageRadius').value} km. Try a larger distance.` : 'No garages match your filters yet. Try clearing the search or choosing a different service.'}</div>`;
+    renderGarageMap(list);
   } catch (e) { grid.innerHTML = `<p class="muted">${esc(e.message)} <button class="btn btn-outline" data-action="retry">Retry</button></p>`; }
 }
+/* ---------- nearby garage map ---------- */
+let garageMap = null, garageMapLayer = null, mapRequest = 0, externalGarageCache = [];
+function pinIcon(kind) {
+  return L.divIcon({className:'', html:`<div class="heeben-pin ${kind}"><span>${kind === 'partner' ? 'H' : 'G'}</span></div>`, iconSize:[30,30], iconAnchor:[15,29], popupAnchor:[0,-27]});
+}
+function mapDirections(lat,lng,name,area) {
+  if (Number.isFinite(lat) && Number.isFinite(lng)) return `https://www.google.com/maps/dir/?api=1${userCoords ? `&origin=${userCoords.lat},${userCoords.lng}` : ''}&destination=${lat},${lng}&travelmode=driving`;
+  return `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent((name || 'Garage') + ', ' + (area || ''))}`;
+}
+function ensureGarageMap() {
+  if (!window.L || !$('#garageMap')) { $('#mapStatus').textContent = 'Map library could not load. Please refresh the page.'; return false; }
+  if (!garageMap) {
+    garageMap = L.map('garageMap', {scrollWheelZoom:false}).setView(userCoords ? [userCoords.lat,userCoords.lng] : [12.9716,77.5946], userCoords ? 13 : 11);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {maxZoom:19, attribution:'&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'}).addTo(garageMap);
+    garageMapLayer = L.featureGroup().addTo(garageMap);
+  }
+  setTimeout(() => garageMap.invalidateSize(), 120);
+  return true;
+}
+function safePopup(g, kind) {
+  const name = esc(g.name || 'Nearby garage'), area = esc(g.area || g.address || '');
+  const distance = g.distance_km != null ? `${g.distance_km} km away` : (kind === 'partner' ? 'Heeben-listed garage' : 'Nearby independent garage');
+  const directions = mapDirections(g.lat == null ? NaN : Number(g.lat), g.lng == null ? NaN : Number(g.lng), g.name, g.area || g.address);
+  const partnerLabel = kind === 'partner' ? '<div class="map-popup-meta">Heeben partner</div>' : '';
+  return `<div class="map-popup-title">${name}</div><div class="map-popup-meta">${area} · ${distance}</div>${partnerLabel}<div class="map-popup-actions"><a href="${directions}" target="_blank" rel="noopener">Get directions ↗</a></div>`;
+}
+async function fetchNearbyOSMGarages(center) {
+  const radiusKm = Math.min(25, Math.max(1, Number($('#garageRadius')?.value || 10))); 
+  const radius = radiusKm * 1000;
+  const query = `[out:json][timeout:18];(node(around:${radius},${center.lat},${center.lng})["amenity"="car_repair"];way(around:${radius},${center.lat},${center.lng})["amenity"="car_repair"];relation(around:${radius},${center.lat},${center.lng})["amenity"="car_repair"];node(around:${radius},${center.lat},${center.lng})["shop"="car_repair"];way(around:${radius},${center.lat},${center.lng})["shop"="car_repair"];node(around:${radius},${center.lat},${center.lng})["craft"="mechanic"];way(around:${radius},${center.lat},${center.lng})["craft"="mechanic"];);out center tags;`;
+  const controller = new AbortController(), timer = setTimeout(() => controller.abort(), 22000);
+  try {
+    const response = await fetch('https://overpass-api.de/api/interpreter', {method:'POST', body:query, signal:controller.signal, headers:{'Content-Type':'text/plain;charset=UTF-8'}});
+    if (!response.ok) throw new Error('Nearby map data is temporarily unavailable');
+    const data = await response.json();
+    const seen = new Set();
+    return (data.elements || []).map(el => {
+      const lat = el.lat ?? el.center?.lat, lng = el.lon ?? el.center?.lon, tags = el.tags || {};
+      if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+      const name = tags.name || tags.brand || tags.operator || 'Independent repair garage';
+      const key = `${name.toLowerCase()}|${lat.toFixed(4)}|${lng.toFixed(4)}`; if (seen.has(key)) return null; seen.add(key);
+      return {name, lat, lng, area:[tags['addr:suburb'],tags['addr:city']].filter(Boolean).join(', ') || tags['addr:street'] || 'Nearby area', phone:tags.phone || tags['contact:phone'] || '', distance_km:Math.round(distanceKm(center.lat,center.lng,lat,lng)*10)/10};
+    }).filter(Boolean).sort((a,b)=>a.distance_km-b.distance_km);
+  } finally { clearTimeout(timer); }
+}
+function distanceKm(a,b,c,d) { const rad=x=>x*Math.PI/180, dLat=rad(c-a), dLng=rad(d-b), h=Math.sin(dLat/2)**2+Math.cos(rad(a))*Math.cos(rad(c))*Math.sin(dLng/2)**2; return 6371*2*Math.atan2(Math.sqrt(h),Math.sqrt(1-h)); }
+async function renderGarageMap(partners=[]) {
+  if (!ensureGarageMap()) return;
+  const req = ++mapRequest; garageMapLayer.clearLayers();
+  const points = [];
+  if (userCoords) {
+    const you = L.circleMarker([userCoords.lat,userCoords.lng], {radius:8,color:'#fff',weight:3,fillColor:'#2787db',fillOpacity:1}).bindPopup(`<b>${coordsSource === 'gps' ? 'Your current location' : 'Searched location'}</b>`).addTo(garageMapLayer); points.push(you);
+    $('#mapStatus').textContent = `Searching within ${$('#garageRadius')?.value || 10} km of ${coordsSource === 'gps' ? 'your location' : 'the selected area'}…`;
+    garageMap.setView([userCoords.lat,userCoords.lng],13);
+    try {
+      externalGarageCache = await fetchNearbyOSMGarages(userCoords);
+    } catch (e) {
+      if (req === mapRequest) $('#mapStatus').textContent = 'Could not load independent garage data right now. Heeben partner locations are still shown.';
+    }
+  } else {
+    $('#mapStatus').textContent = 'Enter any area, city or PIN code above, or use your current location.';
+    externalGarageCache = [];
+  }
+  if (req !== mapRequest) return;
+  partners.filter(g=>g.lat!=null && g.lng!=null).forEach(g=>{
+    const m=L.marker([Number(g.lat),Number(g.lng)],{icon:pinIcon('partner')}).bindPopup(safePopup(g,'partner')).addTo(garageMapLayer); points.push(m);
+  });
+  externalGarageCache.forEach(g=>{
+    const m=L.marker([g.lat,g.lng],{icon:pinIcon('nearby')}).bindPopup(safePopup(g,'nearby')).addTo(garageMapLayer); points.push(m);
+  });
+  const externalCount=externalGarageCache.length, partnerCount=partners.filter(g=>g.lat!=null&&g.lng!=null).length;
+  if (userCoords) $('#mapStatus').textContent = `${partnerCount} mapped Heeben partner${partnerCount===1?'':'s'} and ${externalCount} nearby independent garage${externalCount===1?'':'s'} within the selected search area. ${coordsSource === 'gps' ? 'Based on your current location.' : 'Based on your searched location.'} Select a pin for directions.`;
+  else if (partnerCount) $('#mapStatus').textContent = `${partnerCount} Heeben partner locations mapped. Search any area to discover more garages.`;
+  const links = $('#nearbyGarageLinks');
+  if (links) links.innerHTML = externalGarageCache.length ? `<h3 class="map-list-title">Other nearby garages</h3>${externalGarageCache.map(g=>`<div class="nearby-garage-row"><span><b>${esc(g.name)}</b><small>${esc(g.area)} · ${g.distance_km} km</small></span><a href="${mapDirections(g.lat,g.lng,g.name,g.area)}" target="_blank" rel="noopener">Directions ↗</a></div>`).join('')}` : '';
+  if (points.length > 1) garageMap.fitBounds(L.featureGroup(points).getBounds().pad(.16),{maxZoom:15});
+  else if (points.length === 1) garageMap.setView(points[0].getLatLng(),14);
+}
+async function searchGaragesAtEnteredLocation() {
+  const input = $('#mapLocationSearch'), button = $('#mapLocationSearchBtn'), query = input?.value.trim();
+  if (!query) { $('#mapStatus').textContent = 'Enter a city, locality or PIN code to search.'; input?.focus(); return; }
+  button.disabled = true; $('#mapStatus').textContent = `Finding ${query}…`;
+  try {
+    const point = await geocodeArea(query);
+    if (!point) { $('#mapStatus').textContent = `Could not find “${query}”. Try a nearby locality, city or PIN code.`; return; }
+    userCoords = point; coordsSource = 'area'; gpsArea = query; if (!$('#garageRadius').value) $('#garageRadius').value = '10'; saveCoords();
+    $('#garageSearch').value = ''; $('#garageSort').value = 'distance';
+    $('#nearStatus').textContent = `Distances are measured from ${query}.`;
+    await loadGarages();
+    if (garageMap) garageMap.setView([point.lat, point.lng], 13);
+  } finally { button.disabled = false; }
+}
+$('#mapLocationSearchBtn')?.addEventListener('click', searchGaragesAtEnteredLocation);
+$('#mapLocationSearch')?.addEventListener('keydown', e => { if (e.key === 'Enter') searchGaragesAtEnteredLocation(); });
+$('#mapLocateBtn')?.addEventListener('click', async e=>{const b=e.currentTarget;b.disabled=true;const c=await locateMe(m=>$('#mapStatus').textContent=m);b.disabled=false;if(c){$('#garageSort').value='distance';await loadGarages();}});
+
 let debounce; ['garageSearch'].forEach(i => $('#' + i).addEventListener('input', () => { clearTimeout(debounce); debounce = setTimeout(loadGarages, 250); }));
 ['garageService', 'garageVehicle', 'garageSort'].forEach(i => $('#' + i).addEventListener('change', loadGarages));
 
@@ -170,12 +267,52 @@ async function renderHome() {
   const el = $('#featuredGarages');
   try { const list = await fetchGarages({sort: 'rating'}); el.innerHTML = list.slice(0, 3).map(g => garageCard(g, true)).join('') || '<p class="muted">Garages will appear here soon.</p>'; } catch { el.innerHTML = ''; }
 }
+const SERVICE_GROUPS_UI = {
+  'Periodic maintenance': ['General service','Basic service','Comprehensive service','Engine oil & filter change','Air filter replacement','Coolant replacement','Periodic inspection','Routine servicing'],
+  'Engine & mechanical repairs': ['Engine diagnostics & repair','Clutch repair','Gearbox / transmission repair','Suspension & steering repair','Brake repair','Brake pad / shoe replacement','Radiator & cooling system repair','Exhaust system repair','Mechanical repairs'],
+  'AC & comfort': ['AC inspection & service','AC gas refill','AC repair'],
+  'Tyres, wheels & battery': ['Tyre replacement','Puncture repair','Wheel alignment & balancing','Battery check & replacement','Tyres & batteries'],
+  'Electrical & EV care': ['Electrical diagnostics','Wiring & lighting repair','EV diagnostics & battery health check','EV charger inspection','Electrical & EV care'],
+  'Cleaning & detailing': ['Exterior wash','Interior deep cleaning','Full car/bike detailing','Machine polishing','Ceramic coating','Cleaning & detailing'],
+  'Two-wheeler specialist jobs': ['Chain cleaning & lubrication','Chain / sprocket replacement','Bike brake service','Scooter belt / CVT service','Bike clutch & cable repair']
+};
+const SERVICE_DESCRIPTIONS = {
+  'General service':'Routine checks and maintenance for everyday reliability.', 'Basic service':'Essential oil, filter and safety checks.', 'Comprehensive service':'Detailed scheduled maintenance and multi-point inspection.',
+  'Engine oil & filter change':'Drain and replace engine oil and oil filter.', 'Air filter replacement':'Inspect and replace a clogged air filter.', 'Coolant replacement':'Flush and refill the engine cooling system.', 'Periodic inspection':'Multi-point inspection of key vehicle systems.',
+  'Engine diagnostics & repair':'Identify engine faults and repair after inspection.', 'Clutch repair':'Clutch inspection, adjustment and repair.', 'Gearbox / transmission repair':'Transmission diagnosis and repair.', 'Suspension & steering repair':'Shocks, struts, steering and related components.', 'Brake repair':'Brake inspection, repair and fluid checks.', 'Brake pad / shoe replacement':'Replace worn brake pads or shoes.', 'Radiator & cooling system repair':'Cooling-system leak and radiator work.', 'Exhaust system repair':'Inspect and repair exhaust components.',
+  'AC inspection & service':'Cooling performance check and AC system inspection.', 'AC gas refill':'AC refrigerant top-up after leak checks.', 'AC repair':'AC compressor, condenser and cooling repairs.',
+  'Tyre replacement':'Supply and fit replacement tyres.', 'Puncture repair':'Repair punctures where safe and suitable.', 'Wheel alignment & balancing':'Correct wheel angles and balance wheels.', 'Battery check & replacement':'Battery health test and replacement.',
+  'Electrical diagnostics':'Trace electrical faults and warning lights.', 'Wiring & lighting repair':'Repair wiring, lamps and electrical connections.', 'EV diagnostics & battery health check':'EV system scan and battery health assessment.', 'EV charger inspection':'Inspect onboard charging and charging connections.',
+  'Exterior wash':'Exterior wash and basic finish.', 'Interior deep cleaning':'Deep clean seats, carpets and cabin surfaces.', 'Full car/bike detailing':'Detailed interior and exterior cleaning.', 'Machine polishing':'Machine polish to improve paint finish.', 'Ceramic coating':'Protective coating; final quote after paint assessment.',
+  'Chain cleaning & lubrication':'Clean, adjust and lubricate motorcycle chain.', 'Chain / sprocket replacement':'Replace worn chain and sprocket set.', 'Bike brake service':'Inspect and service two-wheeler brakes.', 'Scooter belt / CVT service':'Inspect scooter drive belt and CVT assembly.', 'Bike clutch & cable repair':'Adjust or replace clutch cable and related parts.'
+};
+function groupedServices(services) {
+  const remaining = new Set(services);
+  return Object.entries(SERVICE_GROUPS_UI).map(([group, names]) => ({group, items:names.filter(n => remaining.has(n))})).filter(g => g.items.length);
+}
+const SERVICE_ESTIMATES = {
+  'General service':['₹2,500–₹9,000','2–4 hours','Car'], 'Basic service':['₹1,500–₹4,000','1.5–3 hours','Car'], 'Comprehensive service':['₹5,000–₹15,000+','4–8 hours','Car'],
+  'Engine oil & filter change':['₹1,200–₹4,500','45–90 min','Car & 2W'], 'Air filter replacement':['₹300–₹1,500','20–45 min','Car & 2W'], 'Coolant replacement':['₹800–₹2,500','1–2 hours','Car'], 'Periodic inspection':['₹500–₹1,500','30–60 min','Car & 2W'], 'Routine servicing':['₹1,500–₹9,000','1.5–4 hours','Car & 2W'],
+  'Engine diagnostics & repair':['₹500–₹2,000 for diagnosis; repairs extra','1–3 hours+','Car & 2W'], 'Clutch repair':['₹3,000–₹12,000','4–8 hours','Car'], 'Gearbox / transmission repair':['₹3,000–₹25,000+','1–3 days','Car'], 'Suspension & steering repair':['₹1,500–₹12,000+','2–6 hours','Car'], 'Brake repair':['₹800–₹5,000','1–3 hours','Car & 2W'], 'Brake pad / shoe replacement':['₹1,000–₹4,500','1–2 hours','Car'], 'Radiator & cooling system repair':['₹1,000–₹8,000+','2–5 hours','Car'], 'Exhaust system repair':['₹800–₹6,000+','1–3 hours','Car'], 'Mechanical repairs':['Quote after inspection','Varies by repair','Car & 2W'],
+  'AC inspection & service':['₹500–₹1,500','45–90 min','Car'], 'AC gas refill':['₹1,800–₹3,500','1–2 hours','Car'], 'AC repair':['₹1,500–₹15,000+','2–8 hours','Car'],
+  'Tyre replacement':['₹1,500–₹16,500+ per tyre','30–60 min','Car & 2W'], 'Puncture repair':['₹100–₹500','20–45 min','Car & 2W'], 'Wheel alignment & balancing':['₹400–₹1,500','30–60 min','Car'], 'Battery check & replacement':['₹4,000–₹17,500+','30–60 min','Car & 2W'], 'Tyres & batteries':['Varies by tyre / battery','30–60 min','Car & 2W'],
+  'Electrical diagnostics':['₹500–₹2,000 diagnosis','1–3 hours','Car & 2W'], 'Wiring & lighting repair':['₹300–₹4,000+','30 min–3 hours','Car & 2W'], 'EV diagnostics & battery health check':['₹800–₹3,500','1–2 hours','EV'], 'EV charger inspection':['₹500–₹2,000','30–90 min','EV'], 'Electrical & EV care':['Quote after inspection','Varies by issue','Car & 2W / EV'],
+  'Exterior wash':['₹200–₹800','20–45 min','Car & 2W'], 'Interior deep cleaning':['₹1,500–₹8,000','3–6 hours','Car'], 'Full car/bike detailing':['₹1,000–₹15,000+','3–8 hours','Car & 2W'], 'Machine polishing':['₹2,000–₹8,000','3–6 hours','Car'], 'Ceramic coating':['₹12,000–₹40,000+','1–3 days','Car'], 'Cleaning & detailing':['₹200–₹40,000+','20 min–3 days','Car & 2W'],
+  'Chain cleaning & lubrication':['₹150–₹500','20–40 min','2W'], 'Chain / sprocket replacement':['₹800–₹3,500','1–2 hours','2W'], 'Bike brake service':['₹300–₹1,500','30–90 min','2W'], 'Scooter belt / CVT service':['₹800–₹3,500','1–2 hours','2W'], 'Bike clutch & cable repair':['₹300–₹2,500','30–120 min','2W']
+};
 function renderServices() {
-  const icons = ['✧', '◷', '⌁', '◉', 'ϟ'], desc = ['Exterior wash, interior cleaning, deep cleaning and polishing.', 'Periodic service, oil change, filters and general inspection.', 'Brake work, clutch and gear repair, engine diagnostics, suspension.', 'Tyre check, puncture repair, battery check and replacement.', 'Electrical checks, diagnostics, EV inspection and charging support.'];
-  $('#vehicleSelect').innerHTML = [['', 'Any vehicle'], ...meta.vehicles.map(v => [v, v])].map(([v, l]) => `<button class="vehicle-option ${$('#garageVehicle').value === v ? 'selected' : ''}" data-vehicle="${esc(v)}"><b>${esc(l)}</b></button>`).join('');
-  $('#serviceCatalog').innerHTML = meta.services.map((n, i) => `<div class="catalog-item"><div><h4>${icons[i] || '•'} &nbsp;${esc(n)}</h4><p>${desc[i] || ''}</p>${SERVICE_HINTS[n] ? `<p class="price-hint">Typical: ${esc(SERVICE_HINTS[n])}</p>` : ''}</div><button class="btn btn-outline" data-service="${esc(n)}">Find garages ↗</button></div>`).join('');
+  const selected = $('#garageVehicle').value;
+  $('#vehicleSelect').innerHTML = [['', 'Any vehicle'], ...meta.vehicles.map(v => [v, v])].map(([v, l]) => `<button class="vehicle-option ${selected === v ? 'selected' : ''}" data-vehicle="${esc(v)}"><b>${esc(l)}</b></button>`).join('');
+  const q = ($('#serviceGuideSearch')?.value || '').trim().toLowerCase();
+  const groups = groupedServices(meta.services).map(group => ({...group, items:group.items.filter(n => {
+    const estimate = SERVICE_ESTIMATES[n] || ['Price on inspection','Depends on job','Car & 2W'];
+    const fits = !selected || selected === 'Commercial vehicle' || estimate[2].toLowerCase().includes(selected === 'Electric vehicle' ? 'ev' : selected === 'Two-wheeler' ? '2w' : selected.toLowerCase());
+    return fits && (!q || n.toLowerCase().includes(q) || (SERVICE_DESCRIPTIONS[n] || '').toLowerCase().includes(q));
+  })})).filter(g => g.items.length);
+  $('#serviceCatalog').innerHTML = groups.length ? groups.map(group => `<section class="service-group"><h3>${esc(group.group)}</h3><div class="service-guide-grid">${group.items.map(n => { const est = SERVICE_ESTIMATES[n] || ['Price on inspection','Depends on job','Car & 2W']; return `<article class="service-guide-card"><div class="service-guide-card-top"><span class="service-guide-category">${esc(group.group)}</span><span class="service-guide-vehicle">${esc(est[2])}</span></div><h4>${esc(n)}</h4><p>${esc(SERVICE_DESCRIPTIONS[n] || 'Ask the garage for availability and a final quote.')}</p><div class="service-estimate-row"><div><small>Approx. price</small><b>${esc(est[0])}</b></div><div><small>Typical time</small><b>${esc(est[1])}</b></div></div><button class="btn btn-outline" data-service="${esc(n)}">Find garages for this service ↗</button></article>`; }).join('')}</div></section>`).join('') : '<p class="muted">No matching services. Try another search or vehicle type.</p>';
 }
 $('#vehicleSelect').addEventListener('click', e => { const b = e.target.closest('[data-vehicle]'); if (!b) return; $('#garageVehicle').value = b.dataset.vehicle; renderServices(); });
+$('#serviceGuideSearch')?.addEventListener('input', renderServices);
 
 let priceSize = 'h';
 function renderPrices() {
@@ -256,7 +393,7 @@ $('#findNearbyBtn').addEventListener('click', async () => {
   $('#garageSearch').value = useText ? text : '';
   $('#garageSort').value = userCoords ? 'distance' : 'recommended'; go('garages'); if (location.hash === '#garages') loadGarages();
 });
-const directionsUrl = g => g.lat != null ? `https://www.google.com/maps/dir/?api=1&destination=${g.lat},${g.lng}` : '';
+const directionsUrl = g => g.lat != null && g.lng != null ? `https://www.google.com/maps/dir/?api=1${userCoords ? `&origin=${userCoords.lat},${userCoords.lng}` : ''}&destination=${g.lat},${g.lng}&travelmode=driving` : `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(g.name + ', ' + g.area)}`;
 
 /* ---------- garage detail ---------- */
 async function openGarageDetail(id) {
@@ -382,7 +519,7 @@ async function renderGarageDash() {
   <label class="field">Contact number<input required id="gPhone" type="tel" maxlength="18" value="${esc(g?.phone || me.phone)}"></label>
   <label class="field">About your garage<textarea id="gDesc" rows="3" maxlength="500">${esc(g?.description)}</textarea></label>
   <div class="field">Vehicles you service<div class="check-grid">${meta.vehicles.map(v => `<label><input type="checkbox" name="gVeh" value="${esc(v)}" ${veh.has(v) ? 'checked' : ''}> ${esc(v)}</label>`).join('')}</div></div>
-  <div class="field">Services &amp; starting price (₹)<span class="hint">See the <a href="#prices">Price guide</a> for typical market rates.</span><div class="svc-grid">${meta.services.map(s => `<label class="svc-row"><input type="checkbox" name="gSvc" value="${esc(s)}" ${sel.has(s) ? 'checked' : ''}> <span>${esc(s)}${SERVICE_HINTS[s] ? `<small class="svc-hint">${esc(SERVICE_HINTS[s])}</small>` : ''}</span><input type="number" min="1" max="1000000" step="1" data-price="${esc(s)}" value="${price[s] || ''}" placeholder="e.g. 2500" aria-label="Price for ${esc(s)}"></label>`).join('')}</div></div>
+  <div class="field">Services &amp; starting price (₹)<span class="hint">Select every job your workshop offers and enter its starting price. You can update these anytime.</span><div class="owner-service-groups">${groupedServices(meta.services).map(group => `<section class="owner-service-group"><h3>${esc(group.group)}</h3><div class="svc-grid">${group.items.map(s => `<label class="svc-row"><input type="checkbox" name="gSvc" value="${esc(s)}" ${sel.has(s) ? 'checked' : ''}> <span>${esc(s)}${SERVICE_DESCRIPTIONS[s] ? `<small class="svc-hint">${esc(SERVICE_DESCRIPTIONS[s])}</small>` : ''}</span><input type="number" min="1" max="1000000" step="1" data-price="${esc(s)}" value="${price[s] || ''}" placeholder="₹ starting price" aria-label="Price for ${esc(s)}"></label>`).join('')}</div></section>`).join('')}</div></div>
   <div class="two-fields"><label class="field">Bookings per time slot<input id="gCap" type="number" min="1" max="20" value="${g?.capacity || 2}"></label><div class="field">Map location (for “nearest”)<button type="button" class="btn btn-outline" data-action="useGarageLoc">${g?.lat != null ? '✓ Location set — update' : '⌖ Use my current location'}</button></div></div>
   <input type="hidden" id="gLat" value="${g?.lat ?? ''}"><input type="hidden" id="gLng" value="${g?.lng ?? ''}">
   <div class="btn-row"><button class="btn btn-navy">${g ? 'Save changes' : 'List my garage'}</button>${g ? '<button type="button" class="btn btn-quiet" data-action="newGarage">Cancel</button>' : ''}</div><p class="hint form-msg" id="garageMsg" role="alert"></p></form></div></div></div>`;

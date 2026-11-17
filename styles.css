@@ -113,7 +113,7 @@ footer small{width:100%;color:#87929c;font-size:10px}
 .field input:focus,.field select:focus,.field textarea:focus,.filterbar input:focus{border-color:#72869b;box-shadow:0 0 0 3px rgba(114,134,155,.12)}
 .panel>.btn{margin-top:14px}.hint{font-size:10px;color:#7c8994;line-height:1.6}
 .section-subtitle{font:700 20px Manrope;margin:0 0 16px}
-.service-catalog{display:grid;gap:10px}
+.service-catalog{display:grid;gap:22px}.service-group h3,.owner-service-group h3{font:700 15px Manrope;margin:0 0 10px;color:var(--ink)}.service-group-items{display:grid;gap:9px}.owner-service-groups{display:grid;gap:18px;margin-top:12px}.owner-service-group{border:1px solid var(--line);border-radius:12px;padding:13px;background:#fffdf8}
 .catalog-item{background:#fffdf8;border:1px solid var(--line);border-radius:13px;padding:16px;display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center}
 .catalog-item h4{font:700 14px Manrope;margin:0}.catalog-item p{font-size:11px;color:var(--muted);margin:6px 0 0}.catalog-item button{font-size:11px}
 .filterbar{display:grid;grid-template-columns:1.4fr 1fr 1fr;gap:10px;margin-bottom:25px}
@@ -307,7 +307,7 @@ footer small{width:100%;color:#87929c;font-size:10px}
 .vehicle-row{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:12px 0;border-bottom:1px solid var(--line)}.vehicle-row small{display:block;color:var(--muted);font-size:11px;margin-top:3px}
 .vehicle-list{margin:10px 0 18px}
 .check-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}.check-grid label,.svc-row{font-weight:500;font-size:12px;display:flex;align-items:center;gap:8px}
-.svc-grid{display:grid;gap:8px}.svc-row span{flex:1}.svc-row input[type=number]{width:96px!important;padding:8px 10px!important}
+.svc-grid{display:grid;gap:8px}.svc-row span{flex:1;min-width:0}.svc-row .svc-hint{display:block;font-size:10px;color:var(--muted);line-height:1.45;margin-top:3px}.svc-row input[type=number]{width:96px!important;padding:8px 10px!important}
 .slot-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
 .slot{border:1px solid #d7dce0;background:#fff;border-radius:10px;padding:10px 4px;font-size:12px;font-weight:700;color:var(--navy)}
 .slot.selected{background:var(--navy);color:#fff;border-color:var(--navy)}.slot:disabled{background:#f1f0ec;color:#a4aab0;text-decoration:line-through}.slot small{display:block;font-size:9px;text-decoration:none}
@@ -330,3 +330,33 @@ footer small{width:100%;color:#87929c;font-size:10px}
 .near-bar .hint{flex:1 1 200px}
 .dir-link{font-size:11px;color:var(--navy);text-decoration:underline;margin-left:4px;white-space:nowrap}
 .garage-notice{background:#fff4d6;border:1px solid #ecd9a0;border-radius:9px;padding:10px 13px;margin-bottom:14px}.garage-notice[hidden]{display:none}
+
+/* Nearby garage map */
+.garage-map-panel{background:#fffdf8;border:1px solid var(--line);border-radius:18px;padding:20px;margin:4px 0 24px;box-shadow:0 8px 28px rgba(30,39,50,.05)}
+.map-panel-head{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:12px}.map-panel-head h2{font:700 22px Manrope;margin:0 0 4px;color:var(--ink)}.map-panel-head .eyebrow{margin:0 0 5px}.map-panel-head .hint{margin:0}.map-legend{display:flex;flex-wrap:wrap;gap:16px;margin:12px 0;color:var(--muted);font-size:11px}.map-legend span{display:flex;align-items:center;gap:7px}.legend-dot{width:10px;height:10px;border-radius:50%;display:inline-block}.legend-dot.partner{background:#263e57}.legend-dot.nearby{background:#d78b36}.legend-dot.you{background:#2787db}#garageMap{height:440px;width:100%;border-radius:13px;overflow:hidden;background:#e9ece8;z-index:1}.map-footnote{font-size:10px;color:var(--muted);margin:10px 0 0}.heeben-pin{width:30px;height:30px;border:3px solid white;border-radius:50% 50% 50% 0;transform:rotate(-45deg);box-shadow:0 2px 9px #172b3b55;display:grid;place-items:center}.heeben-pin span{transform:rotate(45deg);font-size:12px;color:white;font-weight:800}.heeben-pin.partner{background:#263e57}.heeben-pin.nearby{background:#d78b36}.leaflet-popup-content{min-width:175px;font:12px Manrope,Arial,sans-serif}.map-popup-title{font-weight:800;color:#26394d;font-size:13px;margin-bottom:4px}.map-popup-meta{color:#697581;margin-bottom:9px}.map-popup-actions{display:flex;gap:7px;flex-wrap:wrap}.map-popup-actions a{display:inline-block;background:#263e57;color:#fff!important;padding:7px 10px;border-radius:7px;text-decoration:none;font-size:11px}.map-popup-actions a.secondary{background:#eeeae1;color:#26394d!important}
+@media(max-width:650px){.garage-map-panel{padding:13px}.map-panel-head{align-items:flex-start;flex-direction:column}.map-panel-head h2{font-size:19px}#garageMap{height:360px}.map-legend{gap:10px;font-size:10px}}
+
+.nearby-garage-links{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:12px}.nearby-garage-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:#fff;font-size:11px}.nearby-garage-row b{display:block;color:var(--ink);font-size:11px}.nearby-garage-row small{color:var(--muted)}.nearby-garage-row a{white-space:nowrap;color:var(--navy);font-weight:700;text-decoration:underline}@media(max-width:650px){.nearby-garage-links{grid-template-columns:1fr}}
+
+.map-location-search{display:flex;gap:10px;margin:14px 0 10px}.map-location-search input{flex:1;min-width:0;border:1px solid #d7dce0;background:#fff;padding:12px 14px;border-radius:9px;font-size:13px;color:var(--ink)}.map-location-search input:focus{outline:2px solid #aab9c8;outline-offset:1px}@media(max-width:650px){.map-location-search{flex-direction:column}.map-location-search .btn{width:100%}}
+
+/* Available services guide */
+.service-guide-tools{display:grid;grid-template-columns:1fr minmax(240px,.8fr);gap:14px;align-items:center;margin-bottom:16px}
+.service-guide-tools .vehicle-select{margin:0}
+#serviceGuideSearch{width:100%;border:1px solid #d7dce0;background:#fffdf8;padding:14px 15px;border-radius:10px;font-size:12px;color:var(--ink);outline:none}
+#serviceGuideSearch:focus{border-color:#72869b;box-shadow:0 0 0 3px rgba(114,134,155,.12)}
+.service-guide-note{background:#f0f2f3;border:1px solid #dce2e6;border-radius:10px;padding:13px 15px;font-size:11px;color:#64717d;line-height:1.65;margin:0 0 24px}
+.service-guide-note b{color:var(--ink)}
+.service-guide-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.service-guide-card{background:#fffdf8;border:1px solid var(--line);border-radius:14px;padding:17px;display:flex;flex-direction:column;gap:10px;min-width:0}
+.service-guide-card-top{display:flex;justify-content:space-between;gap:8px;align-items:center}
+.service-guide-category,.service-guide-vehicle{font-size:9px;color:#667583;background:#edf0f2;border-radius:30px;padding:5px 8px}
+.service-guide-vehicle{background:#f4eee3;color:#78664b;white-space:nowrap}
+.service-guide-card h4{font:700 15px Manrope;margin:0;color:var(--ink)}
+.service-guide-card>p{font-size:11px;line-height:1.6;color:var(--muted);margin:0;min-height:34px}
+.service-estimate-row{display:grid;grid-template-columns:1.2fr 1fr;gap:8px;border-top:1px solid var(--line);border-bottom:1px solid var(--line);padding:11px 0;margin-top:auto}
+.service-estimate-row div{display:flex;flex-direction:column;gap:5px;min-width:0}
+.service-estimate-row small{font-size:9px;color:var(--muted)}
+.service-estimate-row b{font-size:12px;color:var(--navy);line-height:1.4}
+.service-guide-card .btn{align-self:flex-start;font-size:10px;margin-top:2px}
+@media(max-width:760px){.service-guide-tools{grid-template-columns:1fr}.service-guide-grid{grid-template-columns:1fr}}

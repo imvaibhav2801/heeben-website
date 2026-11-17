@@ -15,7 +15,17 @@ ROOT = Path(__file__).parent.resolve()
 PUBLIC = ROOT / "public"
 DB_PATH = os.environ.get("HEEBEN_DB", str(ROOT / "data" / "heeben.db"))
 DEMO = os.environ.get("HEEBEN_DEMO", "1") != "0"
-SERVICES = ["Cleaning & detailing", "Routine servicing", "Mechanical repairs", "Tyres & batteries", "Electrical & EV care"]
+SERVICE_GROUPS = {
+    "Periodic maintenance": ["General service", "Basic service", "Comprehensive service", "Engine oil & filter change", "Air filter replacement", "Coolant replacement", "Periodic inspection"],
+    "Engine & mechanical repairs": ["Engine diagnostics & repair", "Clutch repair", "Gearbox / transmission repair", "Suspension & steering repair", "Brake repair", "Brake pad / shoe replacement", "Radiator & cooling system repair", "Exhaust system repair"],
+    "AC & comfort": ["AC inspection & service", "AC gas refill", "AC repair"],
+    "Tyres, wheels & battery": ["Tyre replacement", "Puncture repair", "Wheel alignment & balancing", "Battery check & replacement"],
+    "Electrical & EV care": ["Electrical diagnostics", "Wiring & lighting repair", "EV diagnostics & battery health check", "EV charger inspection"],
+    "Cleaning & detailing": ["Exterior wash", "Interior deep cleaning", "Full car/bike detailing", "Machine polishing", "Ceramic coating"],
+    "Two-wheeler specialist jobs": ["Chain cleaning & lubrication", "Chain / sprocket replacement", "Bike brake service", "Scooter belt / CVT service", "Bike clutch & cable repair"],
+    "Legacy service categories": ["Cleaning & detailing", "Routine servicing", "Mechanical repairs", "Tyres & batteries", "Electrical & EV care"],
+}
+SERVICES = [service for group in SERVICE_GROUPS.values() for service in group]
 VEHICLES = ["Car", "Two-wheeler", "Electric vehicle", "Commercial vehicle"]
 SLOTS = ["09:00 AM", "11:00 AM", "02:00 PM", "04:00 PM"]
 MODES = ["Visit garage", "Pickup requested (subject to availability)"]
@@ -415,7 +425,7 @@ def init_db():
 # ---------- HTTP ----------
 MIME = {".html": "text/html; charset=utf-8", ".css": "text/css; charset=utf-8", ".js": "text/javascript; charset=utf-8", ".svg": "image/svg+xml",
         ".png": "image/png", ".jpg": "image/jpeg", ".ico": "image/x-icon", ".json": "application/json", ".webmanifest": "application/manifest+json", ".txt": "text/plain"}
-CSP = "default-src 'self'; img-src 'self' data: https://images.unsplash.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; connect-src 'self' https://nominatim.openstreetmap.org; frame-ancestors 'none'"
+CSP = "default-src 'self'; script-src 'self' https://unpkg.com; img-src 'self' data: https://images.unsplash.com https://*.tile.openstreetmap.org; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://unpkg.com; font-src https://fonts.gstatic.com; connect-src 'self' https://nominatim.openstreetmap.org https://overpass-api.de; frame-ancestors 'none'"
 
 class Handler(BaseHTTPRequestHandler):
     server_version = "Heeben"
