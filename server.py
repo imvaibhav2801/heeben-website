@@ -16,14 +16,18 @@ PUBLIC = ROOT / "public"
 DB_PATH = os.environ.get("HEEBEN_DB", str(ROOT / "data" / "heeben.db"))
 DEMO = os.environ.get("HEEBEN_DEMO", "1") != "0"
 SERVICE_GROUPS = {
-    "Periodic maintenance": ["General service", "Basic service", "Comprehensive service", "Engine oil & filter change", "Air filter replacement", "Coolant replacement", "Periodic inspection"],
-    "Engine & mechanical repairs": ["Engine diagnostics & repair", "Clutch repair", "Gearbox / transmission repair", "Suspension & steering repair", "Brake repair", "Brake pad / shoe replacement", "Radiator & cooling system repair", "Exhaust system repair"],
-    "AC & comfort": ["AC inspection & service", "AC gas refill", "AC repair"],
-    "Tyres, wheels & battery": ["Tyre replacement", "Puncture repair", "Wheel alignment & balancing", "Battery check & replacement"],
-    "Electrical & EV care": ["Electrical diagnostics", "Wiring & lighting repair", "EV diagnostics & battery health check", "EV charger inspection"],
-    "Cleaning & detailing": ["Exterior wash", "Interior deep cleaning", "Full car/bike detailing", "Machine polishing", "Ceramic coating"],
-    "Two-wheeler specialist jobs": ["Chain cleaning & lubrication", "Chain / sprocket replacement", "Bike brake service", "Scooter belt / CVT service", "Bike clutch & cable repair"],
-    "Legacy service categories": ["Cleaning & detailing", "Routine servicing", "Mechanical repairs", "Tyres & batteries", "Electrical & EV care"],
+    "General car servicing": ["General service", "Basic service", "Comprehensive service", "Engine oil & filter change", "Air filter replacement", "Coolant replacement", "Periodic inspection", "Routine servicing"],
+    "Engine & transmission": ["Engine diagnostics & repair", "Clutch repair", "Gearbox / transmission repair", "Radiator & cooling system repair", "Exhaust system repair", "Mechanical repairs"],
+    "Brakes & suspension": ["Brake repair", "Brake pad / shoe replacement", "Suspension & steering repair", "Bike brake service"],
+    "Denting & painting": ["Denting & painting", "Scratch removal & paint touch-up", "Bumper repair / replacement", "Machine polishing", "Ceramic coating"],
+    "Batteries": ["Battery check & replacement", "Tyres & batteries"],
+    "Tyres & wheels": ["Tyre replacement", "Puncture repair", "Wheel alignment & balancing"],
+    "AC & cooling": ["AC inspection & service", "AC gas refill", "AC repair"],
+    "Electrical & EV services": ["Electrical diagnostics", "Wiring & lighting repair", "EV diagnostics & battery health check", "EV charger inspection", "Electrical & EV care"],
+    "Cleaning & detailing": ["Exterior wash", "Interior deep cleaning", "Full car/bike detailing", "Cleaning & detailing"],
+    "Glass & lights": ["Windshield / glass replacement", "Headlight / tail-light replacement"],
+    "Inspection & diagnostics": ["Pre-purchase vehicle inspection", "Engine scanning / OBD diagnostics", "Full vehicle health inspection", "Pre-trip safety inspection"],
+    "Two-wheeler services": ["Chain cleaning & lubrication", "Chain / sprocket replacement", "Scooter belt / CVT service", "Bike clutch & cable repair"],
 }
 SERVICES = [service for group in SERVICE_GROUPS.values() for service in group]
 VEHICLES = ["Car", "Two-wheeler", "Electric vehicle", "Commercial vehicle"]
@@ -49,7 +53,8 @@ CREATE TABLE IF NOT EXISTS vehicles(id INTEGER PRIMARY KEY, user_id INTEGER NOT 
 CREATE TABLE IF NOT EXISTS bookings(id INTEGER PRIMARY KEY, user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   garage_id INTEGER NOT NULL REFERENCES garages(id) ON DELETE CASCADE, service TEXT NOT NULL, vehicle TEXT NOT NULL,
   date TEXT NOT NULL, time TEXT NOT NULL, mode TEXT NOT NULL, notes TEXT DEFAULT '', contact_phone TEXT DEFAULT '',
-  status TEXT NOT NULL, garage_note TEXT DEFAULT '', created TEXT NOT NULL, updated TEXT NOT NULL);
+  status TEXT NOT NULL, garage_note TEXT DEFAULT '', estimated_price INTEGER NOT NULL DEFAULT 0, created TEXT NOT NULL, updated TEXT NOT NULL,
+  vehicle_type TEXT DEFAULT '', quote_amount INTEGER, quote_note TEXT DEFAULT '', quote_status TEXT DEFAULT 'Not sent', health_report TEXT DEFAULT '');
 CREATE INDEX IF NOT EXISTS ix_bookings_slot ON bookings(garage_id, date, time);
 CREATE TABLE IF NOT EXISTS reviews(id INTEGER PRIMARY KEY, booking_id INTEGER NOT NULL UNIQUE REFERENCES bookings(id) ON DELETE CASCADE,
   garage_id INTEGER NOT NULL REFERENCES garages(id) ON DELETE CASCADE, user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -128,6 +133,7 @@ def booking_dict(c, b, for_owner=False):
     d = dict(b)
     g = c.execute("SELECT name, area, phone FROM garages WHERE id=?", (b["garage_id"],)).fetchone()
     d["garage_name"], d["garage_area"], d["garage_phone"] = g["name"], g["area"], g["phone"]
+    d["booking_ref"] = f"HB-{datetime.strptime(b['created'][:10], '%Y-%m-%d').strftime('%y%m%d')}-{b['id']:06d}"
     r = c.execute("SELECT rating, text FROM reviews WHERE booking_id=?", (b["id"],)).fetchone()
     d["review"] = dict(r) if r else None
     if for_owner:
@@ -243,7 +249,8 @@ def slots(x, id):
     g = x.c.execute("SELECT capacity FROM garages WHERE id=? AND active=1", (id,)).fetchone(); need(g, "Garage not found", 404)
     d = valid_date(x.q.get("date", [""])[0]); need(d >= date.today(), "Pick today or a future date")
     taken = {r["time"]: r["n"] for r in x.c.execute("SELECT time, COUNT(*) n FROM bookings WHERE garage_id=? AND date=? AND status IN('Requested','Confirmed') GROUP BY time", (id, d.isoformat()))}
-    return dict(slots=[dict(time=t, available=max(0, g["capacity"] - taken.get(t, 0)) > 0) for t in SLOTS])
+    current_time = datetime.now().strftime("%I:%M %p") if d == date.today() else None
+    return dict(slots=[dict(time=t, available=(max(0, g["capacity"] - taken.get(t, 0)) > 0 and (current_time is None or datetime.strptime(t, "%I:%M %p").time() > datetime.strptime(current_time, "%I:%M %p").time()))) for t in SLOTS])
 
 def parse_garage(b):
     name, area = s(b.get("name"), 80, "Garage name"), s(b.get("area"), 120, "Area / city")
@@ -340,20 +347,21 @@ def save_garage(x, id):
 def create_booking(x):
     u = x.role("customer"); b = x.body
     g = x.c.execute("SELECT * FROM garages WHERE id=? AND active=1", (b.get("garage_id"),)).fetchone(); need(g, "Garage not found", 404)
-    price = x.c.execute("SELECT 1 FROM garage_services WHERE garage_id=? AND service=?", (g["id"], b.get("service"))).fetchone()
+    price = x.c.execute("SELECT price FROM garage_services WHERE garage_id=? AND service=?", (g["id"], b.get("service"))).fetchone()
     need(price, "This garage does not offer that service")
-    d = valid_date(b.get("date", "")); need(d >= date.today(), "Pick today or a future date")
+    d = valid_date(b.get("date", "")); need(date.today() <= d <= date.today() + __import__("datetime").timedelta(days=30), "Choose a date within the next 30 days")
     need(b.get("time") in SLOTS, "Choose a time slot"); need(b.get("mode") in MODES, "Choose a service option")
-    vehicle = s(b.get("vehicle"), 80, "Vehicle"); notes = s(b.get("notes"), 400, "Notes", False)
+    if d == date.today(): need(datetime.strptime(b["time"], "%I:%M %p").time() > datetime.now().time(), "That time has already passed. Choose another slot.")
+    vehicle = s(b.get("vehicle"), 80, "Vehicle"); vehicle_type = b.get("vehicle_type", ""); need(vehicle_type in VEHICLES, "Choose your vehicle type"); notes = s(b.get("notes"), 400, "Notes", False)
     phone = s(b.get("phone"), 18, "Phone", False) or u["phone"]; need(not phone or PHONE_RE.match(phone), "Enter a valid phone number")
     need(x.c.execute("SELECT COUNT(*) FROM bookings WHERE user_id=? AND status IN('Requested','Confirmed') AND date>=?", (u["id"], date.today().isoformat())).fetchone()[0] < 15, "You have too many open bookings")
     x.c.execute("BEGIN IMMEDIATE")  # serialise slot check + insert
     n = x.c.execute("SELECT COUNT(*) FROM bookings WHERE garage_id=? AND date=? AND time=? AND status IN('Requested','Confirmed')", (g["id"], d.isoformat(), b["time"])).fetchone()[0]
     need(n < g["capacity"], "That time slot is full. Please choose another.", 409)
-    cur = x.c.execute("""INSERT INTO bookings(user_id,garage_id,service,vehicle,date,time,mode,notes,contact_phone,status,created,updated)
-                         VALUES(?,?,?,?,?,?,?,?,?,'Requested',?,?)""", (u["id"], g["id"], b["service"], vehicle, d.isoformat(), b["time"], b["mode"], notes, phone, now(), now()))
+    cur = x.c.execute("""INSERT INTO bookings(user_id,garage_id,service,vehicle,date,time,mode,notes,contact_phone,status,estimated_price,created,updated,vehicle_type)
+                         VALUES(?,?,?,?,?,?,?,?,?,'Requested',?,?,?,?)""", (u["id"], g["id"], b["service"], vehicle, d.isoformat(), b["time"], b["mode"], notes, phone, price["price"], now(), now(), vehicle_type))
     if phone and not u["phone"]: x.c.execute("UPDATE users SET phone=? WHERE id=?", (phone, u["id"]))
-    return dict(id=cur.lastrowid)
+    return dict(id=cur.lastrowid, booking_ref=f"HB-{datetime.now().strftime('%y%m%d')}-{cur.lastrowid:06d}", estimated_price=price["price"])
 
 @route("GET", "/api/bookings")
 def my_bookings(x):
@@ -391,6 +399,26 @@ def set_status(x, id):
     st = x.body.get("status"); need(st in TRANSITIONS.get(b["status"], ()), f"Cannot change a {b['status']} booking to {st}")
     x.c.execute("UPDATE bookings SET status=?, garage_note=?, updated=? WHERE id=?", (st, s(x.body.get("note"), 300, "Note", False), now(), id)); return dict(ok=True)
 
+@route("POST", "/api/bookings/<id>/quote")
+def send_quote(x, id):
+    u = x.role("owner")
+    b = x.c.execute("SELECT b.* FROM bookings b JOIN garages g ON g.id=b.garage_id WHERE b.id=? AND g.owner_id=?", (id, u["id"])).fetchone(); need(b, "Booking not found", 404)
+    need(b["status"] in ("Confirmed", "Completed"), "Accept the booking before sending a quotation")
+    try: amount = int(x.body.get("amount"))
+    except Exception: amount = 0
+    need(1 <= amount <= 1000000, "Enter a valid quotation amount")
+    note = s(x.body.get("note"), 500, "Quotation details", False)
+    report = s(x.body.get("health_report"), 1200, "Vehicle health report", False)
+    x.c.execute("UPDATE bookings SET quote_amount=?,quote_note=?,quote_status='Pending customer approval',health_report=?,updated=? WHERE id=?", (amount, note, report, now(), id))
+    return dict(ok=True)
+
+@route("POST", "/api/bookings/<id>/quote-response")
+def quote_response(x, id):
+    u = x.role("customer"); b = x.c.execute("SELECT * FROM bookings WHERE id=? AND user_id=?", (id, u["id"])).fetchone(); need(b, "Booking not found", 404)
+    need(b["quote_status"] == "Pending customer approval", "There is no quotation awaiting approval")
+    decision = x.body.get("decision"); need(decision in ("Approved", "Declined"), "Choose approve or decline")
+    x.c.execute("UPDATE bookings SET quote_status=?,updated=? WHERE id=?", (decision, now(), id)); return dict(ok=True)
+
 @route("POST", "/api/contact")
 def contact(x):
     need(not rate_limited("contact:" + x.ip, 5, 3600), "Too many messages. Try again later.", 429)
@@ -412,6 +440,13 @@ DEMO_OWNER = ("owner@heeben.demo", "heeben-demo-1")
 def init_db():
     Path(DB_PATH).parent.mkdir(parents=True, exist_ok=True)
     c = db(); c.executescript(SCHEMA)
+    # Backward-compatible migration for databases created before booking price snapshots.
+    booking_cols = {r["name"] for r in c.execute("PRAGMA table_info(bookings)")}
+    if "estimated_price" not in booking_cols:
+        c.execute("ALTER TABLE bookings ADD COLUMN estimated_price INTEGER NOT NULL DEFAULT 0")
+        c.execute("UPDATE bookings SET estimated_price=COALESCE((SELECT price FROM garage_services gs WHERE gs.garage_id=bookings.garage_id AND gs.service=bookings.service),0)")
+    for col, definition in [("vehicle_type", "TEXT DEFAULT ''"), ("quote_amount", "INTEGER"), ("quote_note", "TEXT DEFAULT ''"), ("quote_status", "TEXT DEFAULT 'Not sent'"), ("health_report", "TEXT DEFAULT ''")]:
+        if col not in booking_cols: c.execute(f"ALTER TABLE bookings ADD COLUMN {col} {definition}")
     if DEMO and not c.execute("SELECT 1 FROM garages").fetchone():
         h, salt = hash_pw(DEMO_OWNER[1])
         uid = c.execute("INSERT OR IGNORE INTO users(name,email,pw_hash,salt,role,created) VALUES('Demo Garage Owner',?,?,?,'owner',?)", (DEMO_OWNER[0], h, salt, now())).lastrowid

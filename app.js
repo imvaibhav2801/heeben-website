@@ -7,7 +7,25 @@ const todayStr = () => { const d = new Date(); return new Date(d - d.getTimezone
 
 let me = null, meta = {services: [], vehicles: [], slots: [], modes: []};
 let userCoords = null, homeVehicle = 'Car', garageCache = {}, myVehicles = [], bookingCtx = null, ownerGarages = [], editingGarage = null, ownerTab = 'pending';
-const VIEWS = ['home','services','prices','garages','bookings','account','garage','how','contact','legal'];
+const CITY_OPTIONS = ['Bengaluru','Mumbai','Delhi','New Delhi','Hyderabad','Chennai','Pune','Kolkata','Ahmedabad','Jaipur','Kochi','Thiruvananthapuram','Coimbatore','Mysuru','Mangaluru','Bhubaneswar','Indore','Bhopal','Nagpur','Surat','Vadodara','Lucknow','Chandigarh','Gurugram','Noida','Bhilai','Channarayapatna','Other'];
+let selectedCity = 'Bengaluru';
+function initCitySelectors() {
+  try { selectedCity = localStorage.getItem('heeben-city') || 'Bengaluru'; } catch {}
+  ['homeCity','mapCity'].forEach(id => { const el = $('#' + id); if (!el) return; el.innerHTML = CITY_OPTIONS.map(c => `<option value="${esc(c)}">${esc(c === 'Other' ? 'Other city / enter manually' : c)}</option>`).join(''); el.value = CITY_OPTIONS.includes(selectedCity) ? selectedCity : 'Other'; });
+}
+function setSelectedCity(city, sourceId) {
+  selectedCity = city || 'Bengaluru'; try { localStorage.setItem('heeben-city', selectedCity); } catch {}
+  ['homeCity','mapCity'].forEach(id => { const el = $('#' + id); if (el && id !== sourceId) el.value = CITY_OPTIONS.includes(selectedCity) ? selectedCity : 'Other'; });
+}
+function locationQuery(area) {
+  const city = selectedCity === 'Other' ? '' : selectedCity;
+  const clean = (area || '').trim();
+  if (!clean) return city;
+  if (!city || clean.toLowerCase().includes(city.toLowerCase())) return clean;
+  return `${clean}, ${city}, India`;
+}
+initCitySelectors();
+const VIEWS = ['home','services','cart','prices','extras','garages','bookings','account','garage','how','contact','legal'];
 
 /* ---------- API ---------- */
 async function api(path, method = 'GET', body) {
@@ -43,7 +61,7 @@ function show(view) {
   $('#mainNav').classList.remove('open'); $('#mobileMenu').setAttribute('aria-expanded', 'false');
   window.scrollTo({top: 0});
   document.title = (view === 'home' ? '' : view.charAt(0).toUpperCase() + view.slice(1) + ' · ') + 'Heeben — We Care Beyond the Drive';
-  ({home: renderHome, services: renderServices, prices: renderPrices, garages: loadGarages, bookings: renderBookings, account: renderAccount, garage: renderGarageDash}[view] || (() => {}))();
+  ({home: renderHome, services: renderServices, cart: renderCart, prices: renderPrices, garages: loadGarages, bookings: renderBookings, account: renderAccount, garage: renderGarageDash}[view] || (() => {}))();
 }
 window.addEventListener('hashchange', () => show(location.hash.slice(1) || 'home'));
 
@@ -99,7 +117,12 @@ document.addEventListener('click', e => {
   const g = t.closest('[data-go]'); if (g) {
     const to = g.dataset.go; if (to === 'partners') return go('garage'); return go(to);
   }
+  const add = t.closest('[data-cart-add]'); if (add) { addToCart(add.dataset.cartAdd); return; }
+  const remove = t.closest('[data-cart-remove]'); if (remove) { removeFromCart(remove.dataset.cartRemove); return; }
+  if (t.closest('[data-cart-clear]')) { cart = []; saveCart(); renderCart(); toast('Cart cleared.'); return; }
+  if (t.closest('[data-cart-checkout]')) { if (!cart.length) return; $('#garageService').value = cart[0].name; toast(cart.length > 1 ? 'Choose a garage for the first service. You can request other services separately.' : 'Choose a garage for this service.'); return go('garages'); }
   const sv = t.closest('[data-service]'); if (sv) { $('#garageService').value = sv.dataset.service; return go('garages'); }
+  const ex = t.closest('[data-extra]'); if (ex) { const topic = ex.dataset.extra; go('contact'); $('#contactMessage').value = `I'm interested in: ${topic}.\nCity / area: \nVehicle type and model: \nDetails: `; $('#contactName').focus(); return; }
   const a = t.closest('[data-action]'); if (a) actions[a.dataset.action]?.(a, e);
 });
 document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModals(); });
@@ -112,6 +135,8 @@ const actions = {
   book: b => openBooking(b.dataset.id, b.dataset.svc),
   cancel: b => { if (confirm('Cancel this booking request?')) guard(b, async () => { await api(`/bookings/${b.dataset.id}/cancel`, 'POST', {}); toast('Booking cancelled.'); renderBookings(); }); },
   review: b => { $('#reviewBookingId').value = b.dataset.id; $('#reviewText').value = ''; openModal('reviewModal'); },
+  quote: b => { $('#quoteBookingId').value = b.dataset.id; $('#quoteAmount').value = ''; $('#quoteNote').value = ''; $('#quoteHealth').value = ''; openModal('quoteModal'); },
+  quoteDecision: b => guard(b, async () => { await api(`/bookings/${b.dataset.id}/quote-response`, 'POST', {decision: b.dataset.decision}); toast('Your response was sent to the garage.'); renderBookings(); }),
   respond: b => { const st = b.dataset.status; $('#noteBookingId').value = b.dataset.id; $('#noteStatus').value = st; $('#noteText').value = '';
     $('#noteTitle').textContent = {Confirmed: 'Accept this request.', Rejected: 'Decline this request.', Completed: 'Mark as completed.'}[st]; $('#noteSubmit').textContent = {Confirmed: 'Accept', Rejected: 'Decline', Completed: 'Mark completed'}[st]; openModal('noteModal'); },
   delVehicle: b => guard(b, async () => { await api('/vehicles/' + b.dataset.id, 'DELETE'); renderAccount(); }),
@@ -243,7 +268,7 @@ async function renderGarageMap(partners=[]) {
   else if (points.length === 1) garageMap.setView(points[0].getLatLng(),14);
 }
 async function searchGaragesAtEnteredLocation() {
-  const input = $('#mapLocationSearch'), button = $('#mapLocationSearchBtn'), query = input?.value.trim();
+  const input = $('#mapLocationSearch'), button = $('#mapLocationSearchBtn'), area = input?.value.trim(), query = locationQuery(area);
   if (!query) { $('#mapStatus').textContent = 'Enter a city, locality or PIN code to search.'; input?.focus(); return; }
   button.disabled = true; $('#mapStatus').textContent = `Finding ${query}…`;
   try {
@@ -251,11 +276,13 @@ async function searchGaragesAtEnteredLocation() {
     if (!point) { $('#mapStatus').textContent = `Could not find “${query}”. Try a nearby locality, city or PIN code.`; return; }
     userCoords = point; coordsSource = 'area'; gpsArea = query; if (!$('#garageRadius').value) $('#garageRadius').value = '10'; saveCoords();
     $('#garageSearch').value = ''; $('#garageSort').value = 'distance';
-    $('#nearStatus').textContent = `Distances are measured from ${query}.`;
+    $('#nearStatus').textContent = `Distances are measured from ${query}.`; $('#mapStatus').textContent = `Showing garages around ${query}.`;
     await loadGarages();
     if (garageMap) garageMap.setView([point.lat, point.lng], 13);
   } finally { button.disabled = false; }
 }
+$('#homeCity')?.addEventListener('change', e => { setSelectedCity(e.target.value, 'homeCity'); if (e.target.value !== 'Other') { $('#homeLocation').value = ''; $('#gpsStatus').textContent = `City selected: ${e.target.value}. Add an area for a more precise search, or find garages across the city.`; } else { $('#gpsStatus').textContent = 'Enter your city and area in the location field below.'; $('#homeLocation').focus(); } });
+$('#mapCity')?.addEventListener('change', e => { setSelectedCity(e.target.value, 'mapCity'); if (e.target.value !== 'Other') { $('#mapLocationSearch').value = ''; $('#mapStatus').textContent = `Selected ${e.target.value}. Search to explore garages across this city, or enter a specific area.`; } else { $('#mapStatus').textContent = 'Enter a city or area in the search field.'; $('#mapLocationSearch').focus(); } });
 $('#mapLocationSearchBtn')?.addEventListener('click', searchGaragesAtEnteredLocation);
 $('#mapLocationSearch')?.addEventListener('keydown', e => { if (e.key === 'Enter') searchGaragesAtEnteredLocation(); });
 $('#mapLocateBtn')?.addEventListener('click', async e=>{const b=e.currentTarget;b.disabled=true;const c=await locateMe(m=>$('#mapStatus').textContent=m);b.disabled=false;if(c){$('#garageSort').value='distance';await loadGarages();}});
@@ -268,13 +295,18 @@ async function renderHome() {
   try { const list = await fetchGarages({sort: 'rating'}); el.innerHTML = list.slice(0, 3).map(g => garageCard(g, true)).join('') || '<p class="muted">Garages will appear here soon.</p>'; } catch { el.innerHTML = ''; }
 }
 const SERVICE_GROUPS_UI = {
-  'Periodic maintenance': ['General service','Basic service','Comprehensive service','Engine oil & filter change','Air filter replacement','Coolant replacement','Periodic inspection','Routine servicing'],
-  'Engine & mechanical repairs': ['Engine diagnostics & repair','Clutch repair','Gearbox / transmission repair','Suspension & steering repair','Brake repair','Brake pad / shoe replacement','Radiator & cooling system repair','Exhaust system repair','Mechanical repairs'],
-  'AC & comfort': ['AC inspection & service','AC gas refill','AC repair'],
-  'Tyres, wheels & battery': ['Tyre replacement','Puncture repair','Wheel alignment & balancing','Battery check & replacement','Tyres & batteries'],
-  'Electrical & EV care': ['Electrical diagnostics','Wiring & lighting repair','EV diagnostics & battery health check','EV charger inspection','Electrical & EV care'],
-  'Cleaning & detailing': ['Exterior wash','Interior deep cleaning','Full car/bike detailing','Machine polishing','Ceramic coating','Cleaning & detailing'],
-  'Two-wheeler specialist jobs': ['Chain cleaning & lubrication','Chain / sprocket replacement','Bike brake service','Scooter belt / CVT service','Bike clutch & cable repair']
+  'General car servicing': ['General service','Basic service','Comprehensive service','Engine oil & filter change','Air filter replacement','Coolant replacement','Periodic inspection','Routine servicing'],
+  'Engine & transmission': ['Engine diagnostics & repair','Clutch repair','Gearbox / transmission repair','Radiator & cooling system repair','Exhaust system repair','Mechanical repairs'],
+  'Brakes & suspension': ['Brake repair','Brake pad / shoe replacement','Suspension & steering repair','Bike brake service'],
+  'Denting & painting': ['Denting & painting','Scratch removal & paint touch-up','Bumper repair / replacement','Machine polishing','Ceramic coating'],
+  'Batteries': ['Battery check & replacement','Tyres & batteries'],
+  'Tyres & wheels': ['Tyre replacement','Puncture repair','Wheel alignment & balancing'],
+  'AC & cooling': ['AC inspection & service','AC gas refill','AC repair'],
+  'Electrical & EV services': ['Electrical diagnostics','Wiring & lighting repair','EV diagnostics & battery health check','EV charger inspection','Electrical & EV care'],
+  'Cleaning & detailing': ['Exterior wash','Interior deep cleaning','Full car/bike detailing','Cleaning & detailing'],
+  'Glass & lights': ['Windshield / glass replacement','Headlight / tail-light replacement'],
+  'Inspection & diagnostics': ['Pre-purchase vehicle inspection','Engine scanning / OBD diagnostics','Full vehicle health inspection','Pre-trip safety inspection'],
+  'Two-wheeler services': ['Chain cleaning & lubrication','Chain / sprocket replacement','Scooter belt / CVT service','Bike clutch & cable repair']
 };
 const SERVICE_DESCRIPTIONS = {
   'General service':'Routine checks and maintenance for everyday reliability.', 'Basic service':'Essential oil, filter and safety checks.', 'Comprehensive service':'Detailed scheduled maintenance and multi-point inspection.',
@@ -284,7 +316,13 @@ const SERVICE_DESCRIPTIONS = {
   'Tyre replacement':'Supply and fit replacement tyres.', 'Puncture repair':'Repair punctures where safe and suitable.', 'Wheel alignment & balancing':'Correct wheel angles and balance wheels.', 'Battery check & replacement':'Battery health test and replacement.',
   'Electrical diagnostics':'Trace electrical faults and warning lights.', 'Wiring & lighting repair':'Repair wiring, lamps and electrical connections.', 'EV diagnostics & battery health check':'EV system scan and battery health assessment.', 'EV charger inspection':'Inspect onboard charging and charging connections.',
   'Exterior wash':'Exterior wash and basic finish.', 'Interior deep cleaning':'Deep clean seats, carpets and cabin surfaces.', 'Full car/bike detailing':'Detailed interior and exterior cleaning.', 'Machine polishing':'Machine polish to improve paint finish.', 'Ceramic coating':'Protective coating; final quote after paint assessment.',
+  'Denting & painting':'Repair dents and refinish damaged body panels.', 'Scratch removal & paint touch-up':'Treat minor scratches and touch up affected paint.', 'Bumper repair / replacement':'Repair or replace damaged bumpers.', 'Windshield / glass replacement':'Replace damaged vehicle glass after inspection.', 'Headlight / tail-light replacement':'Replace damaged lamps and restore safe visibility.', 'Pre-purchase vehicle inspection':'Inspect a used vehicle before you buy it.', 'Engine scanning / OBD diagnostics':'Scan vehicle systems for stored fault codes.', 'Full vehicle health inspection':'Check major mechanical, electrical and safety systems.', 'Pre-trip safety inspection':'Check key safety items before a long journey.',
   'Chain cleaning & lubrication':'Clean, adjust and lubricate motorcycle chain.', 'Chain / sprocket replacement':'Replace worn chain and sprocket set.', 'Bike brake service':'Inspect and service two-wheeler brakes.', 'Scooter belt / CVT service':'Inspect scooter drive belt and CVT assembly.', 'Bike clutch & cable repair':'Adjust or replace clutch cable and related parts.'
+};
+const SERVICE_GROUP_ICONS = {
+  'General car servicing':'🔧','Engine & transmission':'⚙️','Brakes & suspension':'🛞','Denting & painting':'🎨',
+  'Batteries':'🔋','Tyres & wheels':'🚗','AC & cooling':'❄️','Electrical & EV services':'⚡',
+  'Cleaning & detailing':'✨','Glass & lights':'💡','Inspection & diagnostics':'🔍','Two-wheeler services':'🏍️'
 };
 function groupedServices(services) {
   const remaining = new Set(services);
@@ -298,8 +336,70 @@ const SERVICE_ESTIMATES = {
   'Tyre replacement':['₹1,500–₹16,500+ per tyre','30–60 min','Car & 2W'], 'Puncture repair':['₹100–₹500','20–45 min','Car & 2W'], 'Wheel alignment & balancing':['₹400–₹1,500','30–60 min','Car'], 'Battery check & replacement':['₹4,000–₹17,500+','30–60 min','Car & 2W'], 'Tyres & batteries':['Varies by tyre / battery','30–60 min','Car & 2W'],
   'Electrical diagnostics':['₹500–₹2,000 diagnosis','1–3 hours','Car & 2W'], 'Wiring & lighting repair':['₹300–₹4,000+','30 min–3 hours','Car & 2W'], 'EV diagnostics & battery health check':['₹800–₹3,500','1–2 hours','EV'], 'EV charger inspection':['₹500–₹2,000','30–90 min','EV'], 'Electrical & EV care':['Quote after inspection','Varies by issue','Car & 2W / EV'],
   'Exterior wash':['₹200–₹800','20–45 min','Car & 2W'], 'Interior deep cleaning':['₹1,500–₹8,000','3–6 hours','Car'], 'Full car/bike detailing':['₹1,000–₹15,000+','3–8 hours','Car & 2W'], 'Machine polishing':['₹2,000–₹8,000','3–6 hours','Car'], 'Ceramic coating':['₹12,000–₹40,000+','1–3 days','Car'], 'Cleaning & detailing':['₹200–₹40,000+','20 min–3 days','Car & 2W'],
+  'Denting & painting':['Quote after inspection','1–5 days','Car'], 'Scratch removal & paint touch-up':['₹800–₹5,000+','2–6 hours','Car'], 'Bumper repair / replacement':['Quote after inspection','4 hours–2 days','Car'], 'Windshield / glass replacement':['Quote after inspection','2–4 hours','Car'], 'Headlight / tail-light replacement':['₹500–₹12,000+','30 min–2 hours','Car & 2W'], 'Pre-purchase vehicle inspection':['₹800–₹3,000','1–2 hours','Car & 2W'], 'Engine scanning / OBD diagnostics':['₹500–₹2,000','30–90 min','Car & 2W'], 'Full vehicle health inspection':['₹500–₹2,500','45–120 min','Car & 2W'], 'Pre-trip safety inspection':['₹300–₹1,500','30–60 min','Car & 2W'],
   'Chain cleaning & lubrication':['₹150–₹500','20–40 min','2W'], 'Chain / sprocket replacement':['₹800–₹3,500','1–2 hours','2W'], 'Bike brake service':['₹300–₹1,500','30–90 min','2W'], 'Scooter belt / CVT service':['₹800–₹3,500','1–2 hours','2W'], 'Bike clutch & cable repair':['₹300–₹2,500','30–120 min','2W']
 };
+const CAR_CATALOG = {
+  'Maruti Suzuki': {'Alto K10':'hatchback','S-Presso':'hatchback','Celerio':'hatchback','Wagon R':'hatchback','Swift':'hatchback','Ignis':'hatchback','Baleno':'hatchback','Dzire':'sedan','Ciaz':'sedan','Brezza':'compact-suv','Fronx':'compact-suv','Grand Vitara':'suv','Jimny':'suv','Ertiga':'mpv','XL6':'mpv','Invicto':'premium'},
+  'Hyundai': {'Grand i10 Nios':'hatchback','i20':'hatchback','Aura':'sedan','Verna':'sedan','Venue':'compact-suv','Venue N Line':'compact-suv','Creta':'suv','Alcazar':'suv','Exter':'compact-suv','Tucson':'premium','Ioniq 5':'premium'},
+  'Tata': {'Tiago':'hatchback','Tigor':'sedan','Altroz':'hatchback','Punch':'compact-suv','Nexon':'compact-suv','Curvv':'suv','Harrier':'suv','Safari':'suv','Tiago EV':'hatchback','Tigor EV':'sedan','Nexon EV':'compact-suv','Punch EV':'compact-suv'},
+  'Mahindra': {'Bolero':'suv','Bolero Neo':'suv','Thar':'suv','Thar Roxx':'suv','XUV 3XO':'compact-suv','Scorpio Classic':'suv','Scorpio N':'suv','XUV700':'suv','XUV400 EV':'compact-suv','BE 6':'premium','XEV 9e':'premium'},
+  'Kia': {'Sonet':'compact-suv','Seltos':'suv','Carens':'mpv','Carnival':'premium','EV6':'premium','EV9':'premium'},
+  'Toyota': {'Glanza':'hatchback','Taisor':'compact-suv','Urban Cruiser Hyryder':'suv','Rumion':'mpv','Innova Crysta':'mpv','Innova Hycross':'mpv','Fortuner':'premium','Camry':'premium','Hilux':'premium','Vellfire':'luxury'},
+  'Honda': {'Amaze':'sedan','City':'sedan','Elevate':'suv'},
+  'Renault': {'Kwid':'hatchback','Triber':'mpv','Kiger':'compact-suv'},
+  'Nissan': {'Magnite':'compact-suv','X-Trail':'premium'},
+  'Skoda': {'Kylaq':'compact-suv','Kushaq':'suv','Slavia':'sedan','Kodiaq':'premium','Superb':'premium'},
+  'Volkswagen': {'Taigun':'suv','Virtus':'sedan','Tiguan':'premium'},
+  'MG': {'Comet EV':'hatchback','Windsor EV':'compact-suv','Astor':'suv','Hector':'suv','Hector Plus':'suv','Gloster':'premium','ZS EV':'suv','Cyberster':'luxury'},
+  'Jeep': {'Compass':'premium','Meridian':'premium','Wrangler':'luxury','Grand Cherokee':'luxury'},
+  'Citroën': {'C3':'hatchback','C3 Aircross':'suv','Basalt':'suv','eC3':'hatchback'},
+  'BYD': {'Atto 3':'premium','eMAX 7':'premium','Seal':'luxury','Sealion 7':'luxury'},
+  'BMW': {'2 Series Gran Coupe':'luxury','3 Series':'luxury','5 Series':'luxury','X1':'luxury','X3':'luxury','X5':'luxury','iX1':'luxury','i4':'luxury','i7':'luxury'},
+  'Mercedes-Benz': {'A-Class Limousine':'luxury','C-Class':'luxury','E-Class':'luxury','GLA':'luxury','GLC':'luxury','GLE':'luxury','GLS':'luxury','EQS':'luxury'},
+  'Audi': {'A4':'luxury','A6':'luxury','Q3':'luxury','Q5':'luxury','Q7':'luxury','Q8':'luxury','e-tron':'luxury'},
+  'Volvo': {'EX30':'luxury','XC40':'luxury','XC60':'luxury','XC90':'luxury','C40 Recharge':'luxury'},
+  'Lexus': {'ES':'luxury','NX':'luxury','RX':'luxury','LM':'luxury'},
+  'Land Rover': {'Defender':'luxury','Discovery Sport':'luxury','Range Rover Evoque':'luxury','Range Rover Velar':'luxury','Range Rover Sport':'luxury','Range Rover':'luxury'},
+  'Isuzu': {'D-Max V-Cross':'premium','MU-X':'premium'},
+  'Force Motors': {'Gurkha':'premium','Trax Cruiser':'premium'},
+  'MINI': {'Cooper S':'luxury','Countryman':'luxury'},
+  'Porsche': {'Macan':'luxury','Cayenne':'luxury','Panamera':'luxury','911':'luxury','Taycan':'luxury'},
+  'Jaguar': {'F-Pace':'luxury','F-Type':'luxury','I-Pace':'luxury'},
+  'Maserati': {'Grecale':'luxury','Levante':'luxury','Quattroporte':'luxury'},
+  'Lamborghini': {'Urus':'luxury','Huracan':'luxury','Revuelto':'luxury'},
+  'Ferrari': {'Roma':'luxury','296 GTB':'luxury','SF90':'luxury'},
+  'Rolls-Royce': {'Ghost':'luxury','Cullinan':'luxury','Spectre':'luxury'},
+  'Other / not listed': {'Enter my car manually':'other'}
+};
+const CAR_MULTIPLIERS = {hatchback:1, sedan:1.12, 'compact-suv':1.2, suv:1.35, mpv:1.3, premium:1.65, luxury:2.15, other:1};
+let selectedCar = {brand:'', model:'', year:'', segment:'', custom:''};
+try { selectedCar = {...selectedCar, ...JSON.parse(localStorage.getItem('heeben-selected-car') || '{}')}; } catch {}
+function carLabel() { return selectedCar.model ? `${selectedCar.brand === 'Other / not listed' ? '' : selectedCar.brand + ' '}${selectedCar.model}${selectedCar.year ? ' (' + selectedCar.year + ')' : ''}`.trim() : ''; }
+function initCarPicker() {
+  const brand = $('#carBrand'), model = $('#carModel'), year = $('#carYear'); if (!brand || !model || !year) return;
+  brand.innerHTML = '<option value="">Select brand</option>' + Object.keys(CAR_CATALOG).map(b => `<option value="${esc(b)}">${esc(b)}</option>`).join('');
+  const years = Array.from({length:26},(_,i)=>String(new Date().getFullYear()-i)); year.insertAdjacentHTML('beforeend', years.map(y=>`<option value="${y}">${y}</option>`).join(''));
+  brand.value = selectedCar.brand || '';
+  function updateModels() {
+    const entries = Object.entries(CAR_CATALOG[brand.value] || {});
+    model.disabled = !brand.value; model.innerHTML = '<option value="">Select model</option>' + entries.map(([m])=>`<option value="${esc(m)}">${esc(m)}</option>`).join('');
+    if (selectedCar.model && entries.some(([m])=>m===selectedCar.model)) model.value=selectedCar.model;
+    if (brand.value === 'Other / not listed') model.insertAdjacentHTML('beforeend','<option value="My car is not listed">My car is not listed</option>');
+  }
+  updateModels(); year.value = selectedCar.year || ''; if(selectedCar.model) $('#garageVehicle').value='Car';
+  brand.addEventListener('change',()=>{selectedCar={brand:brand.value,model:'',year:year.value,segment:''};updateModels();persistCar();renderServices();});
+  model.addEventListener('change',()=>{selectedCar.model=model.value;selectedCar.segment=(CAR_CATALOG[selectedCar.brand]||{})[model.value]||'other';if(selectedCar.model)$('#garageVehicle').value='Car';persistCar();renderServices();});
+  year.addEventListener('change',()=>{selectedCar.year=year.value;persistCar();renderServices();});
+  $('#clearCarSelection').addEventListener('click',()=>{selectedCar={brand:'',model:'',year:'',segment:'',custom:''};brand.value='';model.disabled=true;model.innerHTML='<option value="">Select brand first</option>';year.value='';persistCar();renderServices();});
+}
+function persistCar(){try{localStorage.setItem('heeben-selected-car',JSON.stringify(selectedCar));}catch{};const note=$('#selectedCarNote');if(note)note.textContent=carLabel()?`Selected vehicle: ${carLabel()}. Estimates are adjusted using an indicative vehicle-segment multiplier.`:'No car selected yet. Choose your car for a more relevant estimate.';}
+function adjustedEstimate(text) {
+  if (!selectedCar.segment || !text || !text.includes('₹')) return text;
+  const factor=CAR_MULTIPLIERS[selectedCar.segment]||1;
+  return text.replace(/₹([\d,]+)/g,(_,raw)=>'₹'+(Math.round(Number(raw.replace(/,/g,''))*factor/50)*50).toLocaleString('en-IN'));
+}
+
 function renderServices() {
   const selected = $('#garageVehicle').value;
   $('#vehicleSelect').innerHTML = [['', 'Any vehicle'], ...meta.vehicles.map(v => [v, v])].map(([v, l]) => `<button class="vehicle-option ${selected === v ? 'selected' : ''}" data-vehicle="${esc(v)}"><b>${esc(l)}</b></button>`).join('');
@@ -309,10 +409,38 @@ function renderServices() {
     const fits = !selected || selected === 'Commercial vehicle' || estimate[2].toLowerCase().includes(selected === 'Electric vehicle' ? 'ev' : selected === 'Two-wheeler' ? '2w' : selected.toLowerCase());
     return fits && (!q || n.toLowerCase().includes(q) || (SERVICE_DESCRIPTIONS[n] || '').toLowerCase().includes(q));
   })})).filter(g => g.items.length);
-  $('#serviceCatalog').innerHTML = groups.length ? groups.map(group => `<section class="service-group"><h3>${esc(group.group)}</h3><div class="service-guide-grid">${group.items.map(n => { const est = SERVICE_ESTIMATES[n] || ['Price on inspection','Depends on job','Car & 2W']; return `<article class="service-guide-card"><div class="service-guide-card-top"><span class="service-guide-category">${esc(group.group)}</span><span class="service-guide-vehicle">${esc(est[2])}</span></div><h4>${esc(n)}</h4><p>${esc(SERVICE_DESCRIPTIONS[n] || 'Ask the garage for availability and a final quote.')}</p><div class="service-estimate-row"><div><small>Approx. price</small><b>${esc(est[0])}</b></div><div><small>Typical time</small><b>${esc(est[1])}</b></div></div><button class="btn btn-outline" data-service="${esc(n)}">Find garages for this service ↗</button></article>`; }).join('')}</div></section>`).join('') : '<p class="muted">No matching services. Try another search or vehicle type.</p>';
+  $('#serviceCatalog').innerHTML = groups.length ? groups.map(group => `<section class="service-group"><div class="service-category-heading"><span class="service-category-icon">${SERVICE_GROUP_ICONS[group.group] || '🔧'}</span><div><h3>${esc(group.group)}</h3><small>${group.items.length} ${group.items.length === 1 ? 'service' : 'services'}</small></div></div><div class="service-guide-grid">${group.items.map(n => { const est = SERVICE_ESTIMATES[n] || ['Price on inspection','Depends on job','Car & 2W']; const shownPrice = adjustedEstimate(est[0]); return `<article class="service-guide-card"><div class="service-guide-card-top"><span class="service-guide-category">${esc(group.group)}</span><span class="service-guide-vehicle">${esc(est[2])}</span></div><h4>${esc(n)}</h4><p>${esc(SERVICE_DESCRIPTIONS[n] || 'Ask the garage for availability and a final quote.')}</p><div class="service-estimate-row"><div><small>Approx. price</small><b>${esc(shownPrice)}</b></div><div><small>Typical time</small><b>${esc(est[1])}</b></div></div><div class="service-card-actions"><button class="btn btn-outline" data-service="${esc(n)}">Find garages ↗</button><button class="btn btn-navy" data-cart-add="${esc(n)}">＋ Add to cart</button></div></article>`; }).join('')}</div></section>`).join('') : '<p class="muted">No matching services. Try another search or vehicle type.</p>';
 }
 $('#vehicleSelect').addEventListener('click', e => { const b = e.target.closest('[data-vehicle]'); if (!b) return; $('#garageVehicle').value = b.dataset.vehicle; renderServices(); });
+initCarPicker(); persistCar();
 $('#serviceGuideSearch')?.addEventListener('input', renderServices);
+
+/* ---------- service cart ---------- */
+let cart = [];
+try { cart = JSON.parse(localStorage.getItem('heeben-service-cart') || '[]'); if (!Array.isArray(cart)) cart = []; } catch { cart = []; }
+function saveCart() {
+  try { localStorage.setItem('heeben-service-cart', JSON.stringify(cart)); } catch {}
+  const count = $('#cartCount'); if (count) count.textContent = cart.length;
+}
+function addToCart(name) {
+  if (cart.some(item => item.name === name)) { toast('This service is already in your cart.'); return; }
+  const estimate = SERVICE_ESTIMATES[name] || ['Price on inspection','Depends on job','Car & 2W'];
+  cart.push({name, estimate: adjustedEstimate(estimate[0]), time: estimate[1], vehicle: carLabel() || estimate[2]});
+  saveCart(); toast(`${name} added to your cart.`);
+}
+function removeFromCart(name) { cart = cart.filter(item => item.name !== name); saveCart(); renderCart(); }
+function renderCart() {
+  saveCart();
+  const items = $('#cartItems'), summary = $('#cartSummary'); if (!items || !summary) return;
+  if (!cart.length) {
+    items.innerHTML = '<div class="panel cart-empty"><div class="cart-empty-icon">🛒</div><h2>Your cart is empty.</h2><p class="muted">Browse Heeben services and add the jobs you may need.</p><button class="btn btn-navy" data-go="services">Explore services ↗</button></div>';
+    summary.innerHTML = '<p class="eyebrow">ORDER SUMMARY</p><h2>No services yet</h2><p class="hint">Your selected services will appear here.</p>';
+    return;
+  }
+  items.innerHTML = cart.map(item => `<article class="cart-item"><div class="cart-item-icon">🔧</div><div class="cart-item-info"><h3>${esc(item.name)}</h3><p>${esc(item.vehicle)} · ${esc(item.time)}</p><small>Indicative estimate: ${esc(item.estimate)}</small></div><button class="btn btn-quiet cart-remove" data-cart-remove="${esc(item.name)}">Remove</button></article>`).join('');
+  summary.innerHTML = `<p class="eyebrow">ORDER SUMMARY</p><h2>${cart.length} selected ${cart.length === 1 ? 'service' : 'services'}</h2><div class="cart-summary-line"><span>Selected services</span><b>${cart.length}</b></div><p class="hint">Prices are indicative only. The garage sets its own starting price and confirms the final quote after reviewing your vehicle and requested work.</p><button class="btn btn-navy cart-proceed" data-cart-checkout>Find garages for these services ↗</button><button class="btn btn-outline cart-clear" data-cart-clear>Clear cart</button><p class="hint">Currently, you will choose a garage for one service at a time. Multiple services are not combined into a single booking yet.</p>`;
+}
+saveCart();
 
 let priceSize = 'h';
 function renderPrices() {
@@ -362,7 +490,8 @@ async function locateMe(setStatus) {
     userCoords = {lat: pos.coords.latitude, lng: pos.coords.longitude, acc: pos.coords.accuracy}; coordsSource = 'gps'; gpsArea = ''; saveCoords();
     setStatus(`Location found (accurate to ~${fmtAcc(userCoords.acc)}). Nearest garages come first.`);
     timedJson(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${userCoords.lat}&lon=${userCoords.lng}`).then(j => {
-      const a = j?.address || {}, area = a.suburb || a.neighbourhood || a.city_district || a.town || a.city || '';
+      const a = j?.address || {}, area = a.suburb || a.neighbourhood || a.city_district || a.town || a.city || '', city = a.city || a.town || a.state_district || '';
+      if (city && CITY_OPTIONS.includes(city)) { setSelectedCity(city); $('#homeCity').value = city; $('#mapCity').value = city; }
       if (area) { gpsArea = area; $('#homeLocation').value = area; saveCoords(); }
     });
     return userCoords;
@@ -383,9 +512,9 @@ $('#nearMeBtn').addEventListener('click', async () => {
 });
 $('#garageRadius').addEventListener('change', loadGarages);
 $('#findNearbyBtn').addEventListener('click', async () => {
-  const btn = $('#findNearbyBtn'), text = $('#homeLocation').value.trim(), st = $('#gpsStatus'); let useText = false;
+  const btn = $('#findNearbyBtn'), area = $('#homeLocation').value.trim(), text = locationQuery(area), st = $('#gpsStatus'); let useText = false;
   $('#garageVehicle').value = homeVehicle; $('#garageService').value = '';
-  if (text && !(coordsSource === 'gps' && userCoords && (!gpsArea || text === gpsArea))) {   // typed area: turn it into coordinates
+  if (text && !(coordsSource === 'gps' && userCoords && gpsArea && text === gpsArea)) {   // typed area: turn it into coordinates
     btn.disabled = true; st.textContent = 'Locating that area…';
     const c = await geocodeArea(text); btn.disabled = false;
     if (c) { userCoords = c; coordsSource = 'area'; st.textContent = `Showing garages closest to ${text}.`; } else { useText = true; if (coordsSource === 'area') userCoords = null; st.textContent = 'Couldn’t pin that area on the map, so searching by name instead.'; }
@@ -421,13 +550,17 @@ async function openBooking(id, svc) {
   bookingCtx = {garage: g, slot: null};
   $('#bookingTitle').textContent = 'Book with ' + g.name;
   $('#bookingService').innerHTML = g.services.map(s => `<option value="${esc(s.service)}" ${s.service === (svc || $('#garageService').value) ? 'selected' : ''}>${esc(s.service)} — from ${money(s.price)}</option>`).join('');
-  $('#bookingVehicleSel').innerHTML = myVehicles.map(v => `<option value="${esc(v.model)}">${esc(v.model)} (${esc(v.type)})</option>`).join('') + '<option value="__new">+ Another vehicle…</option>';
-  $('#bookingVehicleNewWrap').style.display = myVehicles.length ? 'none' : ''; $('#bookingVehicleNew').value = '';
+  updateBookingEstimate();
+  $('#bookingVehicleSel').innerHTML = myVehicles.map(v => `<option value="${esc(v.model)}" data-type="${esc(v.type)}">${esc(v.model)} (${esc(v.type)})</option>`).join('') + '<option value="__new">+ Add another vehicle…</option>';
+  $('#bookingVehicleType').innerHTML = meta.vehicles.map(v => `<option>${esc(v)}</option>`).join('');
+  $('#bookingVehicleNewWrap').style.display = myVehicles.length ? 'none' : ''; $('#bookingVehicleNew').value = ''; if (myVehicles.length) $('#bookingVehicleType').value = myVehicles[0].type;
   $('#bookingMode').innerHTML = meta.modes.map(m => `<option>${esc(m)}</option>`).join('');
-  $('#bookingDate').min = $('#bookingDate').value = todayStr(); $('#bookingNotes').value = ''; $('#bookingPhone').value = me.phone || ''; $('#bookingMessage').textContent = '';
+  $('#bookingDate').min = todayStr(); const maxDate = new Date(); maxDate.setDate(maxDate.getDate() + 30); $('#bookingDate').max = new Date(maxDate - maxDate.getTimezoneOffset() * 60000).toISOString().slice(0, 10); $('#bookingDate').value = todayStr(); $('#bookingNotes').value = ''; $('#bookingPhone').value = me.phone || ''; $('#bookingMessage').textContent = '';
   openModal('bookingModal'); loadSlots();
 }
-$('#bookingVehicleSel').onchange = () => { $('#bookingVehicleNewWrap').style.display = $('#bookingVehicleSel').value === '__new' ? '' : 'none'; };
+$('#bookingVehicleSel').onchange = () => { const isNew = $('#bookingVehicleSel').value === '__new'; $('#bookingVehicleNewWrap').style.display = isNew ? '' : 'none'; if (!isNew) $('#bookingVehicleType').value = $('#bookingVehicleSel').selectedOptions[0]?.dataset.type || meta.vehicles[0]; };
+function updateBookingEstimate() { const chosen = bookingCtx?.garage?.services?.find(x => x.service === $('#bookingService').value); $('#bookingEstimatePrice').textContent = chosen ? 'From ' + money(chosen.price) : '—'; }
+$('#bookingService').onchange = updateBookingEstimate;
 async function loadSlots() {
   const grid = $('#slotGrid'), d = $('#bookingDate').value; bookingCtx.slot = null;
   if (!d) { grid.innerHTML = ''; return; }
@@ -441,14 +574,14 @@ $('#bookingDate').onchange = loadSlots;
 $('#slotGrid').onclick = e => { const b = e.target.closest('.slot'); if (!b || b.disabled) return; $$('#slotGrid .slot').forEach(x => { x.classList.toggle('selected', x === b); x.setAttribute('aria-checked', x === b); }); bookingCtx.slot = b.dataset.slot; };
 $('#bookingForm').onsubmit = async e => {
   e.preventDefault(); const msg = $('#bookingMessage'); msg.textContent = '';
-  const sel = $('#bookingVehicleSel').value, vehicle = (sel === '__new' || !myVehicles.length) ? $('#bookingVehicleNew').value.trim() : sel;
+  const sel = $('#bookingVehicleSel').value, vehicle = (sel === '__new' || !myVehicles.length) ? $('#bookingVehicleNew').value.trim() : sel, vehicleType = $('#bookingVehicleType').value;
   if (!vehicle) return msg.textContent = 'Please enter your vehicle model.';
   if (!bookingCtx.slot) return msg.textContent = 'Please choose a time slot.';
   const btn = $('#bookingSubmit'); btn.disabled = true;
   try {
-    await api('/bookings', 'POST', {garage_id: bookingCtx.garage.id, service: $('#bookingService').value, vehicle, date: $('#bookingDate').value, time: bookingCtx.slot, mode: $('#bookingMode').value, notes: $('#bookingNotes').value.trim(), phone: $('#bookingPhone').value.trim()});
+    const created = await api('/bookings', 'POST', {garage_id: bookingCtx.garage.id, service: $('#bookingService').value, vehicle, vehicle_type: vehicleType, date: $('#bookingDate').value, time: bookingCtx.slot, mode: $('#bookingMode').value, notes: $('#bookingNotes').value.trim(), phone: $('#bookingPhone').value.trim()});
     if (me && !me.phone) me.phone = $('#bookingPhone').value.trim();
-    closeModals(); toast('Request sent! The garage will confirm shortly.'); go('bookings'); if (location.hash === '#bookings') renderBookings();
+    closeModals(); toast(`Request ${created.booking_ref} sent! The garage will confirm shortly.`); go('bookings'); if (location.hash === '#bookings') renderBookings();
   } catch (err) { msg.textContent = err.message; if (err.status === 409) loadSlots(); } finally { btn.disabled = false; }
 };
 
@@ -465,7 +598,7 @@ async function renderBookings() {
   try {
     const [{bookings}, {garages: saved}, {reminders}] = await Promise.all([api('/bookings'), api('/saved'), api('/reminders')]);
     const t = todayStr();
-    const card = b => `<article class="booking-card"><div><h4>${esc(b.service)} · ${esc(b.garage_name)}</h4><p>${esc(b.vehicle)} · ${fmtDate(b.date)} at ${esc(b.time)}</p><p>${esc(b.mode)} · Pay at garage</p><p>⌖ ${esc(b.garage_area)} · ☎ ${esc(b.garage_phone)}</p>${b.notes ? `<p class="booking-note">Your note: ${esc(b.notes)}</p>` : ''}${b.garage_note ? `<p class="booking-note">Garage says: ${esc(b.garage_note)}</p>` : ''}${b.review ? `<p>Your review: ${'★'.repeat(b.review.rating)} ${esc(b.review.text)}</p>` : ''}</div>
+    const card = b => `<article class="booking-card"><div><h4>${esc(b.service)} · ${esc(b.garage_name)}</h4><p class="booking-ref">Booking ID: ${esc(b.booking_ref || ('#' + b.id))}</p><p>${esc(b.vehicle_type || 'Vehicle')} · ${esc(b.vehicle)} · ${fmtDate(b.date)} at ${esc(b.time)}</p><p>${esc(b.mode)} · Pay at garage</p><p>Garage starting price at booking: <b>${b.estimated_price ? money(b.estimated_price) : 'To be confirmed'}</b></p><p>⌖ ${esc(b.garage_area)} · ☎ ${esc(b.garage_phone)}</p>${b.notes ? `<p class="booking-note">Your note: ${esc(b.notes)}</p>` : ''}${b.garage_note ? `<p class="booking-note">Garage says: ${esc(b.garage_note)}</p>` : ''}${b.quote_amount ? `<p class="booking-note"><b>Garage quotation: ${money(b.quote_amount)}</b> · ${esc(b.quote_status)}${b.quote_note ? `<br>${esc(b.quote_note)}` : ''}</p>${b.health_report ? `<p class="booking-note">Vehicle health report: ${esc(b.health_report)}</p>` : ''}${b.quote_status === 'Pending customer approval' ? `<div class="btn-row"><button class="btn btn-navy" data-action="quoteDecision" data-id="${b.id}" data-decision="Approved">Approve quote</button><button class="btn btn-outline" data-action="quoteDecision" data-id="${b.id}" data-decision="Declined">Decline quote</button></div>` : ''}` : ''}${b.review ? `<p>Your review: ${'★'.repeat(b.review.rating)} ${esc(b.review.text)}</p>` : ''}</div>
       <div class="booking-actions"><div class="booking-status-wrap">${statusPill(b.status)}</div>${['Requested', 'Confirmed'].includes(b.status) ? `<button class="btn btn-outline" data-action="cancel" data-id="${b.id}">Cancel</button>` : ''}${b.status === 'Completed' && !b.review ? `<button class="btn btn-navy" data-action="review" data-id="${b.id}">Review</button>` : ''}</div></article>`;
     const up = bookings.filter(b => ['Requested', 'Confirmed'].includes(b.status) && b.date >= t).reverse(), past = bookings.filter(b => !up.includes(b));
     el.innerHTML = `<div class="dashboard-top"><div><h2>Upcoming</h2></div><button class="btn btn-navy" data-go="garages">Find a garage ↗</button></div>
@@ -535,9 +668,10 @@ function renderOwnerBookings() {
   const t = todayStr(), tabs = {pending: ['New', b => b.status === 'Requested'], upcoming: ['Upcoming', b => b.status === 'Confirmed'], all: ['All', () => true]};
   $('#ownerTabs').innerHTML = Object.entries(tabs).map(([k, [l, f]]) => `<button class="tab ${ownerTab === k ? 'active' : ''}" data-action="ownerTab" data-tab="${k}">${l} (${ownerBookings.filter(f).length})</button>`).join('');
   const list = ownerBookings.filter(tabs[ownerTab][1]); if (ownerTab !== 'all') list.sort((a, b) => a.date.localeCompare(b.date) || a.time.localeCompare(b.time));
-  $('#partnerBookings').innerHTML = list.length ? list.map(b => `<article class="booking-card"><div><h4>${esc(b.service)}</h4><p><b>${esc(b.garage_name)}</b> · ${fmtDate(b.date)} at ${esc(b.time)}</p><p>${esc(b.vehicle)} · ${esc(b.mode)}</p><p>👤 ${esc(b.customer.name)} · ☎ <a href="tel:${esc(b.customer.phone)}">${esc(b.customer.phone || 'no phone')}</a></p>${b.notes ? `<p class="booking-note">Customer note: ${esc(b.notes)}</p>` : ''}${b.garage_note ? `<p class="booking-note">Your note: ${esc(b.garage_note)}</p>` : ''}</div>
-    <div class="booking-actions"><div class="booking-status-wrap">${statusPill(b.status)}</div>${b.status === 'Requested' ? `<button class="btn btn-navy" data-action="respond" data-status="Confirmed" data-id="${b.id}">Accept</button><button class="btn btn-outline" data-action="respond" data-status="Rejected" data-id="${b.id}">Decline</button>` : ''}${b.status === 'Confirmed' ? `<button class="btn btn-navy" data-action="respond" data-status="Completed" data-id="${b.id}">Mark completed</button><button class="btn btn-outline" data-action="respond" data-status="Rejected" data-id="${b.id}">Cancel</button>` : ''}</div></article>`).join('') : '<p class="muted">Nothing here yet.</p>';
+  $('#partnerBookings').innerHTML = list.length ? list.map(b => `<article class="booking-card"><div><h4>${esc(b.service)}</h4><p class="booking-ref">Booking ID: ${esc(b.booking_ref || ('#' + b.id))}</p><p><b>${esc(b.garage_name)}</b> · ${fmtDate(b.date)} at ${esc(b.time)}</p><p>Starting price: <b>${b.estimated_price ? money(b.estimated_price) : 'To be confirmed'}</b></p><p>${esc(b.vehicle_type || 'Vehicle')} · ${esc(b.vehicle)} · ${esc(b.mode)}</p><p>👤 ${esc(b.customer.name)} · ☎ <a href="tel:${esc(b.customer.phone)}">${esc(b.customer.phone || 'no phone')}</a></p>${b.notes ? `<p class="booking-note">Customer note: ${esc(b.notes)}</p>` : ''}${b.garage_note ? `<p class="booking-note">Your note: ${esc(b.garage_note)}</p>` : ''}${b.quote_amount ? `<p class="booking-note"><b>Quote: ${money(b.quote_amount)}</b> · ${esc(b.quote_status)}</p>` : ''}</div>
+    <div class="booking-actions"><div class="booking-status-wrap">${statusPill(b.status)}</div>${b.status === 'Requested' ? `<button class="btn btn-navy" data-action="respond" data-status="Confirmed" data-id="${b.id}">Accept</button><button class="btn btn-outline" data-action="respond" data-status="Rejected" data-id="${b.id}">Decline</button>` : ''}${b.status === 'Confirmed' ? `<button class="btn btn-outline" data-action="quote" data-id="${b.id}">Send quotation / health report</button><button class="btn btn-navy" data-action="respond" data-status="Completed" data-id="${b.id}">Mark completed</button><button class="btn btn-outline" data-action="respond" data-status="Rejected" data-id="${b.id}">Cancel</button>` : ''}</div></article>`).join('') : '<p class="muted">Nothing here yet.</p>';
 }
+$('#quoteForm').onsubmit = async e => { e.preventDefault(); try { await api(`/bookings/${$('#quoteBookingId').value}/quote`, 'POST', {amount: $('#quoteAmount').value, note: $('#quoteNote').value, health_report: $('#quoteHealth').value}); closeModals(); toast('Quotation sent to customer for approval.'); renderGarageDash(); } catch (er) { fail(er); } };
 $('#noteForm').onsubmit = async e => { e.preventDefault(); try { await api(`/bookings/${$('#noteBookingId').value}/status`, 'POST', {status: $('#noteStatus').value, note: $('#noteText').value}); closeModals(); toast('Updated.'); renderGarageDash(); } catch (er) { fail(er); } };
 
 /* ---------- contact ---------- */

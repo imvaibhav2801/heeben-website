@@ -113,7 +113,7 @@ footer small{width:100%;color:#87929c;font-size:10px}
 .field input:focus,.field select:focus,.field textarea:focus,.filterbar input:focus{border-color:#72869b;box-shadow:0 0 0 3px rgba(114,134,155,.12)}
 .panel>.btn{margin-top:14px}.hint{font-size:10px;color:#7c8994;line-height:1.6}
 .section-subtitle{font:700 20px Manrope;margin:0 0 16px}
-.service-catalog{display:grid;gap:22px}.service-group h3,.owner-service-group h3{font:700 15px Manrope;margin:0 0 10px;color:var(--ink)}.service-group-items{display:grid;gap:9px}.owner-service-groups{display:grid;gap:18px;margin-top:12px}.owner-service-group{border:1px solid var(--line);border-radius:12px;padding:13px;background:#fffdf8}
+.service-catalog{display:grid;gap:22px}.service-category-heading{display:flex;align-items:center;gap:11px;margin:0 0 12px;padding:13px 15px;border:1px solid var(--line);border-radius:14px;background:#fffdf8}.service-category-heading h3{font:700 15px Manrope;margin:0;color:var(--ink)}.service-category-heading small{display:block;margin-top:3px;color:var(--muted);font-size:12px}.service-category-icon{display:grid;place-items:center;width:38px;height:38px;border-radius:11px;background:#f3eee5;font-size:19px;flex:none}.service-group h3,.owner-service-group h3{font:700 15px Manrope;margin:0 0 10px;color:var(--ink)}.service-group-items{display:grid;gap:9px}.owner-service-groups{display:grid;gap:18px;margin-top:12px}.owner-service-group{border:1px solid var(--line);border-radius:12px;padding:13px;background:#fffdf8}
 .catalog-item{background:#fffdf8;border:1px solid var(--line);border-radius:13px;padding:16px;display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center}
 .catalog-item h4{font:700 14px Manrope;margin:0}.catalog-item p{font-size:11px;color:var(--muted);margin:6px 0 0}.catalog-item button{font-size:11px}
 .filterbar{display:grid;grid-template-columns:1.4fr 1fr 1fr;gap:10px;margin-bottom:25px}
@@ -360,3 +360,46 @@ footer small{width:100%;color:#87929c;font-size:10px}
 .service-estimate-row b{font-size:12px;color:var(--navy);line-height:1.4}
 .service-guide-card .btn{align-self:flex-start;font-size:10px;margin-top:2px}
 @media(max-width:760px){.service-guide-tools{grid-template-columns:1fr}.service-guide-grid{grid-template-columns:1fr}}
+.booking-estimate{display:grid;grid-template-columns:1fr auto;gap:4px 12px;padding:13px 15px;border:1px solid var(--line);border-radius:11px;background:#f7f4ed}.booking-estimate span{font-size:11px;color:var(--muted)}.booking-estimate strong{font:800 16px Manrope;color:var(--navy);text-align:right}.booking-estimate small{grid-column:1/-1;font-size:10px;color:var(--muted);line-height:1.5}.booking-ref{font-size:10px!important;font-weight:700;color:var(--navy)!important;letter-spacing:.02em}
+
+/* City selection controls */
+.city-select{width:100%;border:1px solid #d7dce0;background:#fffdf8;padding:11px 13px;color:var(--ink);border-radius:9px;font-size:12px;outline:none;min-width:0}
+.city-select:focus{border-color:#72869b;box-shadow:0 0 0 3px rgba(114,134,155,.12)}
+.location-sub-label{display:block;margin-top:10px}
+.map-city-search{max-width:360px;margin:12px 0 0}
+.map-city-search .finder-label{display:block;margin-bottom:6px}
+@media(max-width:700px){.map-city-search{max-width:none}.finder-location .city-select{margin-bottom:2px}}
+
+/* Additional Heeben care features */
+.extra-feature-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px}
+.extra-feature{display:flex;flex-direction:column;align-items:flex-start;gap:10px;min-height:100%}
+.extra-feature h2{font-size:1.25rem;margin:0}
+.extra-feature p{color:var(--muted);margin:0;line-height:1.6}
+.extra-feature ul{padding-left:20px;margin:0 0 8px;color:var(--muted);line-height:1.8}
+.extra-feature .btn{margin-top:auto}
+.extra-disclaimer{padding-top:0}
+@media(max-width:900px){.extra-feature-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:600px){.extra-feature-grid{grid-template-columns:1fr}}
+
+
+/* Service cart */
+.btn-cart{background:#fffdf8;border:1px solid var(--line);color:var(--navy);padding:10px 14px;white-space:nowrap}
+.cart-count{display:inline-grid;place-items:center;min-width:21px;height:21px;padding:0 5px;border-radius:99px;background:var(--navy);color:#fff;font-size:10px}
+.service-card-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}.service-card-actions .btn{font-size:11px;padding:10px 13px}
+.cart-layout{display:grid;grid-template-columns:minmax(0,1.7fr) minmax(250px,.8fr);gap:18px;align-items:start}
+.cart-items{display:grid;gap:11px}.cart-item{display:flex;align-items:center;gap:14px;padding:17px;border:1px solid var(--line);background:#fffdf8;border-radius:14px}.cart-item-icon,.cart-empty-icon{display:grid;place-items:center;width:43px;height:43px;flex:none;border-radius:12px;background:#f0ede6;font-size:20px}.cart-item-info{flex:1;min-width:0}.cart-item-info h3{font:700 15px Manrope;margin:0 0 5px}.cart-item-info p,.cart-item-info small{font-size:11px;color:var(--muted);margin:0;line-height:1.6}.cart-remove{font-size:11px;padding:8px 10px}.cart-summary{position:sticky;top:95px}.cart-summary h2{font:700 21px Manrope;margin:0 0 18px}.cart-summary-line{display:flex;justify-content:space-between;padding:13px 0;border-top:1px solid var(--line);border-bottom:1px solid var(--line);font-size:12px}.cart-proceed,.cart-clear{width:100%;margin-top:12px}.cart-empty{padding:32px;text-align:center}.cart-empty-icon{margin:0 auto 12px}.cart-empty h2{font:700 22px Manrope;margin:0 0 8px}.cart-empty .btn{margin-top:10px}
+@media(max-width:760px){.cart-layout{grid-template-columns:1fr}.cart-summary{position:static}.service-card-actions .btn{flex:1}.cart-item{align-items:flex-start}.cart-remove{margin-left:auto}}
+
+/* Choose your car and model-aware estimates */
+.vehicle-picker{margin:0 0 20px;padding:20px 22px;background:#fffdf8}
+.vehicle-picker-heading{display:flex;align-items:flex-start;gap:12px;margin-bottom:16px}
+.vehicle-picker-heading .service-icon{font-size:25px}
+.vehicle-picker-heading h2{font:700 19px Manrope;margin:0 0 4px;color:var(--ink)}
+.vehicle-picker-heading p{font-size:11px;margin:0;line-height:1.5}
+.vehicle-picker-fields{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.vehicle-picker-fields .field{display:flex;flex-direction:column;gap:6px;font-size:11px;color:var(--muted)}
+.vehicle-picker-fields select{width:100%;min-width:0;padding:12px;border:1px solid #d7dce0;background:#fff;border-radius:9px;color:var(--ink);font-size:12px}
+.vehicle-picker-fields select:disabled{opacity:.55;background:#f2f1ed}
+.vehicle-selected-note{font-size:11px;color:var(--navy);margin:12px 0 4px}
+#clearCarSelection{font-size:10px;padding:7px 10px}
+@media(max-width:650px){.vehicle-picker{padding:16px}.vehicle-picker-fields{grid-template-columns:1fr}}
