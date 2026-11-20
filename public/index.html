@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Heeben — We Care Beyond the Drive</title>
+<meta name="description" content="Heeben brings vehicle care services and local garages together.">
+<link rel="stylesheet" href="styles.css">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<header class="topbar">
+  <a class="brand" href="#home" data-view="home" aria-label="Heeben home">heeben<span>.</span></a>
+  <button class="mobile-menu" id="mobileMenu" aria-label="Toggle menu" aria-expanded="false">☰</button>
+  <nav id="mainNav" aria-label="Main navigation">
+    <button class="nav-link active" data-view="home">Explore</button>
+    <button class="nav-link" data-view="services">Services</button>
+    <button class="nav-link" data-view="garages">Find garages</button>
+    <button class="nav-link" data-view="bookings" id="navBookings">My bookings</button>
+    <button class="nav-link" data-view="prices">Price guide</button>
+    <button class="nav-link" data-view="extras">More care</button>
+    <button class="nav-link" data-view="how">How it works</button>
+    <button class="nav-link" data-view="garage" id="navGarage">For garages</button>
+  </nav>
+  <div class="header-actions"><button class="btn btn-cart" data-view="cart" aria-label="View cart">🛒 Cart <span class="cart-count" id="cartCount">0</span></button><button class="btn btn-quiet" id="loginBtn">Log in</button><button class="btn btn-navy" id="signupBtn">Sign up <span aria-hidden="true">↗</span></button></div>
+</header>
+<main id="main">
+<section class="view active" id="home">
+  <section class="home-hero">
+    <div class="hero-image" role="img" aria-label="Modern premium car in a professional vehicle service studio"></div>
+    <div class="hero-shade"></div>
+    <div class="hero-content">
+      <p class="eyebrow hero-eyebrow"><span class="eyebrow-mark">H</span> THE NEW WAY TO CARE FOR YOUR VEHICLE</p>
+      <h1>Better journeys<br>begin with <em>better care.</em></h1>
+      <p class="hero-lead">Find dependable garages, compare services and request your next vehicle appointment, all in one place.</p>
+      <div class="hero-actions"><button class="btn btn-cream btn-large" data-go="garages">Explore nearby garages <span>↗</span></button><button class="hero-text-link" data-go="how">Discover how it works <span>→</span></button></div>
+      <div class="hero-proof"><span class="proof-avatars"><i>H</i><i>✓</i><i>★</i></span><span><b>One place for every ride</b><small>Service discovery made simpler</small></span></div>
+    </div>
+    <div class="hero-index"><span>01</span><i></i><span>VEHICLE CARE, REIMAGINED</span></div>
+  </section>
+
+  <section class="finder-wrap" aria-label="Find nearby garages">
+    <div class="finder-card">
+      <div class="finder-vehicle">
+        <label class="finder-label">What do you drive?</label>
+        <div class="vehicle-pills" id="homeVehicleSelect">
+          <button class="vehicle-pill selected" type="button" data-home-vehicle="Car"><span>🚘</span> Car</button>
+          <button class="vehicle-pill" type="button" data-home-vehicle="Two-wheeler"><span>🏍</span> Two-wheeler</button>
+        </div>
+      </div>
+      <div class="finder-location">
+        <label class="finder-label" for="homeCity">⌖ &nbsp;Choose your city</label>
+        <select id="homeCity" class="city-select" aria-label="Choose your city"></select>
+        <label class="finder-label location-sub-label" for="homeLocation">Your area or locality (optional)</label>
+        <div class="location-input-wrap">
+          <input id="homeLocation" type="text" placeholder="e.g. Koramangala, Whitefield" autocomplete="street-address">
+          <button class="gps-button" id="useMyLocation" type="button" aria-label="Use my current location" title="Use my current location">◎</button>
+        </div>
+        <p class="gps-status" id="gpsStatus" aria-live="polite">Choose a city, enter an area, or use GPS.</p>
+      </div>
+      <button class="btn btn-navy finder-submit" id="findNearbyBtn" type="button">Find garages <span>→</span></button>
+    </div>
+  </section>
+
+  <section class="home-services section">
+    <div class="section-heading compact-heading">
+      <div><p class="eyebrow">CARE THAT COVERS THE DETAILS</p><h2>What does your vehicle need?</h2></div>
+      <button class="btn btn-text" data-go="services">Explore all services <span>→</span></button>
+    </div>
+    <div class="service-shortcuts">
+      <button class="service-shortcut" data-service="Routine servicing"><span class="service-icon">🔧</span><span><b>General servicing</b><small>Keep your vehicle in top shape</small></span><span class="shortcut-arrow">↗</span></button>
+      <button class="service-shortcut" data-service="Mechanical repairs"><span class="service-icon">◉</span><span><b>Brakes & repairs</b><small>Drive with confidence</small></span><span class="shortcut-arrow">↗</span></button>
+      <button class="service-shortcut" data-service="Tyres & batteries"><span class="service-icon">◍</span><span><b>Tyres & wheels</b><small>For a smoother ride</small></span><span class="shortcut-arrow">↗</span></button>
+      <button class="service-shortcut" data-service="Electrical & EV care"><span class="service-icon">ϟ</span><span><b>Battery & electrical</b><small>Never get stranded</small></span><span class="shortcut-arrow">↗</span></button>
+    </div>
+  </section>
+
+  <section class="trust-strip">
+    <div class="trust-title">Why choose<br>Heeben?</div>
+    <div class="trust-item"><span class="trust-icon">⌖</span><span><b>Nearby garages</b><small>Find service centres<br>around your area.</small></span></div>
+    <div class="trust-item"><span class="trust-icon">▣</span><span><b>Easy booking requests</b><small>Book without unnecessary calls.</small></span></div>
+    <div class="trust-item"><span class="trust-icon">★</span><span><b>Customer reviews</b><small>Make informed choices.</small></span></div>
+  </section>
+
+
+
+  <section class="featured-section section">
+    <div class="section-heading"><div><p class="eyebrow">A GOOD PLACE TO START</p><h2>Garages worth a closer look.</h2><p class="muted">Compare garages by service, vehicle, price and rating.</p></div><button class="btn btn-text" data-go="garages">See all garages <span>→</span></button></div>
+    <div class="featured-grid" id="featuredGarages"></div>
+  </section>
+  <section class="how-preview">
+    <div class="how-preview-copy"><p class="eyebrow">LESS SEARCHING. MORE DRIVING.</p><h2>Vehicle care,<br><em>without the guesswork.</em></h2><p>From choosing a service to tracking a request, Heeben keeps the important steps clear.</p><button class="btn btn-navy" data-go="how">See how Heeben works <span>→</span></button></div>
+    <div class="how-preview-steps"><article><span>01</span><div><b>Tell us what you drive</b><small>Choose your vehicle and service need.</small></div></article><article><span>02</span><div><b>Find a nearby garage</b><small>Use your location or search an area.</small></div></article><article><span>03</span><div><b>Send a booking request</b><small>Choose a time and wait for confirmation.</small></div></article></div>
+  </section>
+  <section class="faq-section section"><div><p class="eyebrow">GOOD TO KNOW</p><h2>A few things<br>you might wonder.</h2></div><div class="faq-list">
+    <details><summary>Does requesting a booking confirm my appointment?</summary><p>Not immediately. A request is sent first. The garage needs to accept it before it becomes confirmed.</p></details>
+    <details><summary>Can I use Heeben without sharing my GPS location?</summary><p>Yes. You can type your locality or area manually. Location access is optional.</p></details>
+    <details><summary>Are the garages shown here verified?</summary><p>Garages sign up and list themselves. Listings marked <b>Sample</b> are demo businesses. Ratings only come from customers whose booking the garage marked as completed.</p></details>
+    <details><summary>How do I pay?</summary><p>You pay the garage directly after the service. Heeben does not take payments yet.</p></details>
+    <details><summary>I run a garage. How do I get listed?</summary><p>Sign up with a garage-owner account, add your services and prices, and customers can start sending you booking requests.</p></details>
+  </div></section>
+
+  <section class="home-bottom">
+    <div class="bottom-brand">heeben<span>.</span></div>
+    <div class="bottom-divider"></div>
+    <p>We Care Beyond the Drive.</p>
+    <button class="btn btn-light" data-go="how">How Heeben works <span>→</span></button>
+  </section>
+</section>
+
+<section class="view" id="services">
+  <div class="page-head"><p class="eyebrow">THE HEEBEN SERVICE MENU</p><h1>Available services.<br><em>Know the estimate before you go.</em></h1><p>Explore common car and two-wheeler services with indicative price ranges and typical workshop time.</p></div>
+  <div class="section"><div class="vehicle-picker panel"><div class="vehicle-picker-heading"><span class="service-icon">🚘</span><div><h2>Choose your car</h2><p class="muted">Select your make and model to see estimates adjusted for your vehicle. You can change it anytime.</p></div></div><div class="vehicle-picker-fields"><label class="field">Car brand<select id="carBrand"><option value="">Select brand</option></select></label><label class="field">Car model<select id="carModel" disabled><option value="">Select brand first</option></select></label><label class="field">Model year <select id="carYear"><option value="">Select year (optional)</option></select></label></div><p class="vehicle-selected-note" id="selectedCarNote" aria-live="polite">No car selected yet. Choose your car for a more relevant estimate.</p><button class="btn btn-quiet" id="clearCarSelection" type="button">Clear car selection</button></div><div class="service-guide-tools"><div class="vehicle-select" id="vehicleSelect" role="group" aria-label="Vehicle type"></div><input id="serviceGuideSearch" type="search" placeholder="Search a service — e.g. brake, oil, battery" aria-label="Search available services"></div><div class="service-guide-note"><b>Indicative estimates only.</b> Displayed estimates are adjusted by vehicle segment and are not exact model-specific garage quotes. Actual price and completion time depend on parts, condition and garage. Confirm the final quote and slot with your chosen garage.</div><div class="service-catalog" id="serviceCatalog"></div></div>
+</section>
+
+<section class="view" id="cart">
+  <div class="page-head compact"><p class="eyebrow">YOUR SELECTED SERVICES</p><h1>Your cart.</h1><p>Keep the services you are interested in together before finding a suitable garage.</p></div>
+  <div class="section"><div class="cart-layout"><div id="cartItems" class="cart-items"></div><aside class="panel cart-summary" id="cartSummary"></aside></div></div>
+</section>
+
+<section class="view" id="extras">
+  <div class="page-head"><p class="eyebrow">MORE WAYS HEEBEN CAN HELP</p><h1>Care beyond<br><em>the workshop.</em></h1><p>Explore additional vehicle-care support. Availability depends on the city and participating service partners.</p></div>
+  <div class="section extra-feature-grid">
+    <article class="panel extra-feature"><span class="service-icon">🆘</span><h2>Roadside assistance</h2><p>Request help for a breakdown, flat tyre, dead battery or towing requirement.</p><ul><li>Battery jump-start</li><li>Puncture / tyre assistance</li><li>Towing request</li><li>On-road mechanical help</li></ul><button class="btn btn-navy" data-extra="Roadside assistance">Request assistance</button></article>
+    <article class="panel extra-feature"><span class="service-icon">🛡️</span><h2>Insurance & accident support</h2><p>Ask for help understanding the repair process and finding a garage for accident-related work.</p><ul><li>Accident repair enquiry</li><li>Estimate documentation guidance</li><li>Cashless-repair availability enquiry</li></ul><button class="btn btn-outline" data-extra="Insurance and accident repair support">Get support</button></article>
+    <article class="panel extra-feature"><span class="service-icon">🧰</span><h2>Parts & accessories</h2><p>Tell us what part or accessory you need and your vehicle details.</p><ul><li>Tyres and batteries</li><li>Engine oils and filters</li><li>Infotainment and accessories</li><li>Replacement parts enquiry</li></ul><button class="btn btn-outline" data-extra="Spare parts and accessories enquiry">Find a part</button></article>
+    <article class="panel extra-feature"><span class="service-icon">📅</span><h2>Maintenance plans</h2><p>Register interest in periodic maintenance reminders and bundled service plans from participating garages.</p><ul><li>Periodic service reminders</li><li>Seasonal vehicle check-ups</li><li>Multi-service plan enquiry</li></ul><button class="btn btn-outline" data-extra="Maintenance plan enquiry">Explore plans</button></article>
+    <article class="panel extra-feature"><span class="service-icon">✓</span><h2>Warranty & repair protection</h2><p>Ask whether a garage offers a workmanship warranty or parts warranty for a particular job.</p><ul><li>Garage-provided warranty details</li><li>Parts warranty enquiry</li><li>Repair follow-up support</li></ul><button class="btn btn-outline" data-extra="Warranty and repair protection enquiry">Ask about coverage</button></article>
+    <article class="panel extra-feature"><span class="service-icon">🚘</span><h2>Vehicle inspection</h2><p>Arrange a pre-purchase, pre-trip or general vehicle health inspection.</p><ul><li>Used vehicle inspection</li><li>Engine diagnostics</li><li>Safety and condition report</li></ul><button class="btn btn-outline" data-extra="Vehicle inspection enquiry">Find an inspection</button></article>
+  </div>
+  <div class="section extra-disclaimer"><p class="hint"><b>Important:</b> These are enquiry and discovery options in this MVP, not a promise of 24×7 dispatch, insurance underwriting, cashless claim approval, parts inventory, or a platform-backed warranty. Heeben will confirm availability with a participating provider before anything is booked.</p></div>
+</section>
+
+<section class="view" id="prices">
+  <div class="page-head"><p class="eyebrow">KNOW BEFORE YOU BOOK</p><h1>What vehicle care<br><em>usually costs in India.</em></h1><p>Typical 2026 price ranges for cars. Garages set their own prices, so use this as a guide and confirm with the garage.</p></div>
+  <div class="section"><div class="vehicle-select" id="sizeToggle" role="group" aria-label="Car size"><button class="vehicle-option selected" data-size="h"><b>Hatchback</b></button><button class="vehicle-option" data-size="s"><b>Sedan</b></button><button class="vehicle-option" data-size="u"><b>SUV</b></button></div>
+  <div id="priceBody" class="price-groups"></div>
+  <p class="hint">Estimates compiled from published 2026 Indian price guides. Metro cities (Mumbai, Bengaluru, Delhi) typically run 10–25% higher than smaller cities. Premium and imported cars cost more. Two-wheeler and EV prices are not covered here.</p></div>
+</section>
+
+<section class="view" id="garages">
+  <div class="page-head"><p class="eyebrow">LOCAL VEHICLE-CARE PROFESSIONALS</p><h1>Find a garage<br><em>you can count on.</em></h1><p>Search by area, service or vehicle, then send a booking request.</p></div>
+  <div class="section"><div class="filterbar"><input id="garageSearch" placeholder="Search garage or area..." aria-label="Search garages"><select id="garageService" aria-label="Service"><option value="">All services</option></select><select id="garageVehicle" aria-label="Vehicle"><option value="">All vehicles</option></select><select id="garageSort" aria-label="Sort garages"><option value="recommended">Recommended</option><option value="rating">Highest rated</option><option value="price">Lowest starting price</option><option value="distance">Nearest first</option></select></div>
+  <div class="near-bar"><button class="btn btn-navy" id="nearMeBtn" type="button">◎ Garages near me</button><select id="garageRadius" aria-label="Distance"><option value="">Any distance</option><option value="3">Within 3 km</option><option value="5">Within 5 km</option><option value="10" selected>Within 10 km</option><option value="25">Within 25 km</option></select><span class="hint" id="nearStatus" aria-live="polite"></span></div>
+  <section class="garage-map-panel" aria-label="Nearby garage map"><div class="map-panel-head"><div><p class="eyebrow">EXPLORE ANYWHERE</p><h2>Find garages by location</h2><p class="hint" id="mapStatus">Search a city, area or PIN code, or use your current location.</p></div><button class="btn btn-outline" id="mapLocateBtn" type="button">◎ Use my location</button></div><div class="map-city-search"><label class="finder-label" for="mapCity">Choose city</label><select id="mapCity" class="city-select" aria-label="Choose city for garage search"></select></div><div class="map-location-search"><input id="mapLocationSearch" type="search" placeholder="Optional area or PIN code — e.g. Koramangala" aria-label="Search garages around a location"><button class="btn btn-navy" id="mapLocationSearchBtn" type="button">Search this location ↗</button></div><div class="map-legend"><span><i class="legend-dot partner"></i> Heeben partners</span><span><i class="legend-dot nearby"></i> Other nearby garages</span><span><i class="legend-dot you"></i> Your location</span></div><div id="garageMap" role="application" aria-label="Map showing Heeben partners and nearby garages"></div><div id="nearbyGarageLinks" class="nearby-garage-links" aria-live="polite"></div><p class="map-footnote">Nearby independent garage data is sourced from OpenStreetMap and may be incomplete. Directions open in Google Maps.</p></section>
+  <p class="hint garage-notice" id="garageNotice" hidden>Showing sample garages only: the Heeben server can't be reached from here, so booking and login are unavailable until it is running.</p>
+  <p class="hint" id="garageCount" aria-live="polite"></p><div class="garage-grid" id="garageGrid"></div></div>
+</section>
+
+<section class="view" id="bookings">
+  <div class="page-head compact"><p class="eyebrow">YOUR VEHICLE CARE ACTIVITY</p><h1>My bookings.</h1><p>Track requests, cancel, and review completed services.</p></div>
+  <div class="section" id="bookingsBody"></div>
+</section>
+
+<section class="view" id="account">
+  <div class="page-head compact"><p class="eyebrow">YOUR ACCOUNT</p><h1>Profile &amp; vehicles.</h1><p>Keep your details handy so booking takes seconds.</p></div>
+  <div class="section" id="accountBody"></div>
+</section>
+
+<section class="view" id="garage">
+  <div class="page-head compact"><p class="eyebrow">HEEBEN FOR SERVICE PARTNERS</p><h1>Garage dashboard.</h1><p>List your garage, set your services and prices, and manage booking requests.</p></div>
+  <div class="section" id="garageBody"></div>
+</section>
+
+<section class="view" id="how">
+  <div class="page-head"><p class="eyebrow">A BETTER WAY TO GET IT DONE</p><h1>Vehicle care,<br><em>without the runaround.</em></h1><p>Our goal is to make discovering and arranging vehicle services feel clear and convenient.</p></div>
+  <div class="section steps"><article><b>01</b><div><h2>Choose what you need</h2><p>Start with your vehicle type and the service you're looking for.</p></div></article><article><b>02</b><div><h2>Explore local options</h2><p>Compare garages by service, starting price, rating and distance.</p></div></article><article><b>03</b><div><h2>Request a time slot</h2><p>Pick an available slot and whether you'd prefer pickup or to visit the garage. The garage confirms or declines.</p></div></article><article><b>04</b><div><h2>Get it done and review</h2><p>Pay the garage directly. After the garage marks the job complete, share your feedback.</p></div></article></div>
+</section>
+
+<section class="view" id="contact">
+  <div class="page-head compact"><p class="eyebrow">GET IN TOUCH</p><h1>Contact us.</h1><p>Questions, feedback or partnership ideas? We read every message.</p></div>
+  <div class="section"><div class="panel narrow"><form id="contactForm" class="stack-form"><label class="field">Name<input required id="contactName" maxlength="80"></label><label class="field">Email<input required type="email" id="contactEmail" maxlength="120"></label><label class="field">Message<textarea required id="contactMessage" rows="5" maxlength="1500"></textarea></label><button class="btn btn-navy">Send message</button></form></div></div>
+</section>
+
+<section class="view" id="legal">
+  <div class="page-head compact"><p class="eyebrow">THE FINE PRINT</p><h1>Terms &amp; privacy.</h1></div>
+  <div class="section"><div class="panel narrow prose">
+    <h3>What Heeben does</h3><p>Heeben connects vehicle owners with independent garages. A booking is a request: it is only confirmed once the garage accepts it. Garages set their own prices and are responsible for their work. Prices shown are indicative starting prices.</p>
+    <h3>Payments</h3><p>Heeben does not process payments. You pay the garage directly.</p>
+    <h3>Your data</h3><p>We store your name, email, phone number, vehicles and bookings so the service can work. A booking shares your name, phone, vehicle and notes with that garage only. Passwords are stored hashed. Your location is only used in your browser to sort garages by distance and is never stored by us.</p>
+    <h3>Reviews</h3><p>Only customers with a completed booking can leave a review. Do not post unlawful or abusive content.</p>
+    <p class="hint">This is a starter policy. Have it reviewed by a lawyer before public launch.</p>
+  </div></div>
+</section>
+</main>
+<footer><a class="brand" href="#home" data-view="home">heeben<span>.</span></a><p>We Care Beyond the Drive.</p><div><button data-go="services">Services</button><button data-go="prices">Price guide</button><button data-go="extras">More care</button><button data-go="garages">Find a garage</button><button data-go="partners">Partner with us</button><button data-go="contact">Contact</button><button data-go="legal">Terms &amp; privacy</button></div><small>© 2026 Heeben.</small></footer>
+
+<div class="modal-backdrop" id="authModal" role="dialog" aria-modal="true" aria-labelledby="authTitle"><div class="modal"><button class="modal-close" data-close aria-label="Close">×</button><p class="eyebrow">WELCOME TO HEEBEN</p><h2 id="authTitle">Create your account.</h2>
+<form id="authForm" class="stack-form">
+<div class="role-toggle" id="roleToggle" role="group" aria-label="Account type"><button type="button" class="selected" data-role="customer">I'm a vehicle owner</button><button type="button" data-role="owner">I run a garage</button></div>
+<label class="field" id="nameField">Full name<input id="authName" maxlength="80" autocomplete="name" placeholder="Your name"></label>
+<label class="field">Email<input required type="email" id="authEmail" autocomplete="email" placeholder="you@example.com"></label>
+<label class="field">Password<input required type="password" id="authPassword" minlength="8" autocomplete="current-password" placeholder="At least 8 characters"></label>
+<button class="btn btn-navy" id="authSubmit">Create account</button><p class="hint form-msg" id="authMessage" role="alert"></p></form>
+<button class="switch-auth" id="switchAuth">Already have an account? Log in</button></div></div>
+
+<div class="modal-backdrop" id="garageModal" role="dialog" aria-modal="true" aria-label="Garage details"><div class="modal wide"><button class="modal-close" data-close aria-label="Close">×</button><div id="garageDetail"></div></div></div>
+
+<div class="modal-backdrop" id="bookingModal" role="dialog" aria-modal="true" aria-labelledby="bookingTitle"><div class="modal wide"><button class="modal-close" data-close aria-label="Close">×</button><p class="eyebrow">REQUEST A SERVICE</p><h2 id="bookingTitle">Complete your request.</h2>
+<form id="bookingForm" class="stack-form">
+<div class="two-fields"><label class="field">Service<select id="bookingService" required></select></label><label class="field">Saved vehicle<select id="bookingVehicleSel"></select></label></div>
+<div class="two-fields"><label class="field">Vehicle type<select id="bookingVehicleType" required></select></label><label class="field" id="bookingVehicleNewWrap">Vehicle make &amp; model<input id="bookingVehicleNew" maxlength="80" placeholder="e.g. Honda City / Activa 6G"></label></div>
+<div class="booking-estimate" id="bookingEstimate" aria-live="polite"><span>Garage starting price</span><strong id="bookingEstimatePrice">—</strong><small>Indicative estimate only. The garage will confirm the final cost after inspecting your vehicle.</small></div>
+<label class="field">Date<input id="bookingDate" type="date" required></label>
+<div class="field">Time slot<div class="slot-grid" id="slotGrid" role="radiogroup" aria-label="Time slot"></div></div>
+<label class="field">Tell the garage what you need (optional)<textarea id="bookingNotes" rows="3" maxlength="400" placeholder="Briefly describe the issue or service you need..."></textarea></label>
+<div class="two-fields"><label class="field">Service option<select id="bookingMode"></select></label><label class="field">Phone number<input id="bookingPhone" type="tel" maxlength="18" placeholder="So the garage can reach you" required></label></div>
+<button class="btn btn-navy" id="bookingSubmit">Send booking request</button><p class="hint form-msg" id="bookingMessage" role="alert"></p>
+<p class="hint">The garage will confirm or decline your request. You pay the garage directly after the service.</p></form></div></div>
+
+<div class="modal-backdrop" id="reviewModal" role="dialog" aria-modal="true" aria-label="Leave a review"><div class="modal"><button class="modal-close" data-close aria-label="Close">×</button><p class="eyebrow">SHARE YOUR EXPERIENCE</p><h2>Leave a review.</h2><form id="reviewForm" class="stack-form"><input type="hidden" id="reviewBookingId"><label class="field">Rating<select id="reviewRating"><option value="5">★★★★★ — Excellent</option><option value="4">★★★★ — Good</option><option value="3">★★★ — Okay</option><option value="2">★★ — Poor</option><option value="1">★ — Very poor</option></select></label><label class="field">Your feedback<textarea id="reviewText" rows="3" maxlength="500" placeholder="How was your experience?"></textarea></label><button class="btn btn-navy">Submit review</button></form></div></div>
+
+<div class="modal-backdrop" id="quoteModal" role="dialog" aria-modal="true" aria-label="Send quotation"><div class="modal"><button class="modal-close" data-close aria-label="Close">×</button><p class="eyebrow">SERVICE QUOTATION</p><h2>Send estimate to customer.</h2><form id="quoteForm" class="stack-form"><input type="hidden" id="quoteBookingId"><label class="field">Estimated total (₹)<input type="number" id="quoteAmount" min="1" max="1000000" required></label><label class="field">Work details / parts included<textarea id="quoteNote" rows="3" maxlength="500" placeholder="Describe the work and parts included"></textarea></label><label class="field">Vehicle health report (optional)<textarea id="quoteHealth" rows="3" maxlength="1200" placeholder="Brakes: Good · Tyres: Needs attention · Battery: Good"></textarea></label><button class="btn btn-navy">Send quotation</button></form></div></div>
+<div class="modal-backdrop" id="noteModal" role="dialog" aria-modal="true" aria-label="Respond to request"><div class="modal"><button class="modal-close" data-close aria-label="Close">×</button><p class="eyebrow">BOOKING REQUEST</p><h2 id="noteTitle">Update request.</h2><form id="noteForm" class="stack-form"><input type="hidden" id="noteBookingId"><input type="hidden" id="noteStatus"><label class="field">Message to customer (optional)<textarea id="noteText" rows="3" maxlength="300" placeholder="e.g. Please arrive 10 minutes early."></textarea></label><button class="btn btn-navy" id="noteSubmit">Confirm</button></form></div></div>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+<script src="prices.js"></script>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+<script src="fallback.js"></script>
+<script src="app.js"></script>
+</body></html>
