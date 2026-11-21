@@ -2,10 +2,10 @@
 """Heeben MVP server — Python standard library only (no pip install needed).
 
 Run:  python3 server.py            -> http://localhost:8000
-Env:  PORT, HOST, HEEBEN_DB (sqlite path), HEEBEN_DEMO=0 to skip sample garages/demo owner.
+Env:  PORT, HOST, HEEBEN_DB (sqlite path), HEEBEN_DEMO=1 to load sample garages/demo owner (off by default).
 """
-import hashlib, hmac, json, math, os, re, secrets, sqlite3, sys, threading, time
-from datetime import date, datetime, timezone
+import hashlib, hmac, json, math, os, re, secrets, sqlite3, sys, threading, time, smtplib, ssl
+from datetime import date, datetime, timezone, timedelta
 from http.cookies import SimpleCookie
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -14,7 +14,15 @@ from urllib.parse import parse_qs, urlparse
 ROOT = Path(__file__).parent.resolve()
 PUBLIC = ROOT / "public"
 DB_PATH = os.environ.get("HEEBEN_DB", str(ROOT / "data" / "heeben.db"))
-DEMO = os.environ.get("HEEBEN_DEMO", "1") != "0"
+DEMO = os.environ.get("HEEBEN_DEMO", "0") == "1"
+SMTP_HOST = os.environ.get("SMTP_HOST", "").strip()
+SMTP_PORT = int(os.environ.get("SMTP_PORT", "587"))
+SMTP_USER = os.environ.get("SMTP_USER", "").strip()
+SMTP_PASSWORD = os.environ.get("SMTP_PASSWORD", "")
+SMTP_FROM = os.environ.get("SMTP_FROM", SMTP_USER).strip()
+SMTP_STARTTLS = os.environ.get("SMTP_STARTTLS", "1") == "1"
+CONTACT_EMAIL = os.environ.get("CONTACT_EMAIL", "").strip()
+SITE_URL = os.environ.get("SITE_URL", "https://heeben.com").rstrip("/")
 SERVICE_GROUPS = {
     "General car servicing": ["General service", "Basic service", "Comprehensive service", "Engine oil & filter change", "Air filter replacement", "Coolant replacement", "Periodic inspection", "Routine servicing"],
     "Engine & transmission": ["Engine diagnostics & repair", "Clutch repair", "Gearbox / transmission repair", "Radiator & cooling system repair", "Exhaust system repair", "Mechanical repairs"],
@@ -69,6 +77,7 @@ def db():
     c = sqlite3.connect(DB_PATH, timeout=10)
     c.row_factory = sqlite3.Row
     c.execute("PRAGMA foreign_keys=ON")
+    c.execute("PRAGMA busy_timeout=10000")
     return c
 
 def now(): return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
@@ -89,6 +98,68 @@ def rate_limited(key, limit=8, window=300):
         a = [x for x in _attempts.get(key, []) if t - x < window]
         a.append(t); _attempts[key] = a
         return len(a) > limit
+
+
+def send_email(to_email, subject, body):
+    """Best-effort email delivery. Core booking actions must work without SMTP."""
+    if not (SMTP_HOST and SMTP_FROM and to_email):
+        return False
+    from email.message import EmailMessage
+    msg = EmailMessage()
+    msg["From"] = SMTP_FROM
+    msg["To"] = to_email
+    msg["Subject"] = subject
+    msg.set_content(body)
+    try:
+        if SMTP_PORT == 465:
+            with smtplib.SMTP_SSL(SMTP_HOST, SMTP_PORT, timeout=12, context=ssl.create_default_context()) as server:
+                if SMTP_USER: server.login(SMTP_USER, SMTP_PASSWORD)
+                server.send_message(msg)
+        else:
+            with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=12) as server:
+                server.ehlo()
+                if SMTP_STARTTLS:
+                    server.starttls(context=ssl.create_default_context()); server.ehlo()
+                if SMTP_USER: server.login(SMTP_USER, SMTP_PASSWORD)
+                server.send_message(msg)
+        return True
+    except Exception as exc:
+        sys.stderr.write(f"EMAIL delivery failed ({type(exc).__name__})\n")
+        return False
+
+
+def queue_email(to_email, subject, body):
+    if SMTP_HOST and SMTP_FROM and to_email:
+        threading.Thread(target=send_email, args=(to_email, subject, body), daemon=True).start()
+
+
+def notify_booking_owner(c, booking_id):
+    row = c.execute("""SELECT b.*, g.name garage_name, g.area, u.email owner_email, cu.name customer_name
+                       FROM bookings b JOIN garages g ON g.id=b.garage_id
+                       JOIN users u ON u.id=g.owner_id JOIN users cu ON cu.id=b.user_id
+                       WHERE b.id=?""", (booking_id,)).fetchone()
+    if not row: return
+    ref = f"HB-{datetime.strptime(row['created'][:10], '%Y-%m-%d').strftime('%y%m%d')}-{row['id']:06d}"
+    queue_email(row['owner_email'], f"New Heeben booking request · {ref}",
+        f"Hello,\n\nYou have a new booking request for {row['garage_name']}.\n"
+        f"Customer: {row['customer_name']}\nService: {row['service']}\nVehicle: {row['vehicle_type']} · {row['vehicle']}\n"
+        f"Requested date/time: {row['date']} · {row['time']}\nContact: {row['contact_phone']}\n"
+        f"Booking reference: {ref}\n\nLog in to your Heeben garage dashboard to accept or decline this request: {SITE_URL}\n")
+
+
+def notify_booking_customer(c, booking_id, event):
+    row = c.execute("""SELECT b.*, g.name garage_name, u.email customer_email, u.name customer_name
+                       FROM bookings b JOIN garages g ON g.id=b.garage_id
+                       JOIN users u ON u.id=b.user_id WHERE b.id=?""", (booking_id,)).fetchone()
+    if not row: return
+    if event == "status":
+        subject = f"Your Heeben booking is {row['status'].lower()}"
+        detail = f"Your booking with {row['garage_name']} is now {row['status']}.\nGarage message: {row['garage_note'] or 'No additional message.'}"
+    else:
+        subject = f"A quotation is ready for your Heeben booking"
+        detail = f"{row['garage_name']} has shared a quotation of INR {row['quote_amount']}.\nDetails: {row['quote_note'] or 'Please review the quotation in your account.'}\nVehicle health report: {row['health_report'] or 'Not provided.'}"
+    queue_email(row['customer_email'], subject,
+        f"Hello {row['customer_name']},\n\n{detail}\n\nReview your booking in Heeben: {SITE_URL}\n")
 
 class ApiError(Exception):
     def __init__(self, status, msg): self.status, self.msg = status, msg
@@ -349,7 +420,7 @@ def create_booking(x):
     g = x.c.execute("SELECT * FROM garages WHERE id=? AND active=1", (b.get("garage_id"),)).fetchone(); need(g, "Garage not found", 404)
     price = x.c.execute("SELECT price FROM garage_services WHERE garage_id=? AND service=?", (g["id"], b.get("service"))).fetchone()
     need(price, "This garage does not offer that service")
-    d = valid_date(b.get("date", "")); need(date.today() <= d <= date.today() + __import__("datetime").timedelta(days=30), "Choose a date within the next 30 days")
+    d = valid_date(b.get("date", "")); need(date.today() <= d <= date.today() + timedelta(days=30), "Choose a date within the next 30 days")
     need(b.get("time") in SLOTS, "Choose a time slot"); need(b.get("mode") in MODES, "Choose a service option")
     if d == date.today(): need(datetime.strptime(b["time"], "%I:%M %p").time() > datetime.now().time(), "That time has already passed. Choose another slot.")
     vehicle = s(b.get("vehicle"), 80, "Vehicle"); vehicle_type = b.get("vehicle_type", ""); need(vehicle_type in VEHICLES, "Choose your vehicle type"); notes = s(b.get("notes"), 400, "Notes", False)
@@ -361,6 +432,7 @@ def create_booking(x):
     cur = x.c.execute("""INSERT INTO bookings(user_id,garage_id,service,vehicle,date,time,mode,notes,contact_phone,status,estimated_price,created,updated,vehicle_type)
                          VALUES(?,?,?,?,?,?,?,?,?,'Requested',?,?,?,?)""", (u["id"], g["id"], b["service"], vehicle, d.isoformat(), b["time"], b["mode"], notes, phone, price["price"], now(), now(), vehicle_type))
     if phone and not u["phone"]: x.c.execute("UPDATE users SET phone=? WHERE id=?", (phone, u["id"]))
+    notify_booking_owner(x.c, cur.lastrowid)
     return dict(id=cur.lastrowid, booking_ref=f"HB-{datetime.now().strftime('%y%m%d')}-{cur.lastrowid:06d}", estimated_price=price["price"])
 
 @route("GET", "/api/bookings")
@@ -397,7 +469,9 @@ def set_status(x, id):
     u = x.role("owner")
     b = x.c.execute("SELECT b.* FROM bookings b JOIN garages g ON g.id=b.garage_id WHERE b.id=? AND g.owner_id=?", (id, u["id"])).fetchone(); need(b, "Booking not found", 404)
     st = x.body.get("status"); need(st in TRANSITIONS.get(b["status"], ()), f"Cannot change a {b['status']} booking to {st}")
-    x.c.execute("UPDATE bookings SET status=?, garage_note=?, updated=? WHERE id=?", (st, s(x.body.get("note"), 300, "Note", False), now(), id)); return dict(ok=True)
+    x.c.execute("UPDATE bookings SET status=?, garage_note=?, updated=? WHERE id=?", (st, s(x.body.get("note"), 300, "Note", False), now(), id))
+    notify_booking_customer(x.c, int(id), "status")
+    return dict(ok=True)
 
 @route("POST", "/api/bookings/<id>/quote")
 def send_quote(x, id):
@@ -410,6 +484,7 @@ def send_quote(x, id):
     note = s(x.body.get("note"), 500, "Quotation details", False)
     report = s(x.body.get("health_report"), 1200, "Vehicle health report", False)
     x.c.execute("UPDATE bookings SET quote_amount=?,quote_note=?,quote_status='Pending customer approval',health_report=?,updated=? WHERE id=?", (amount, note, report, now(), id))
+    notify_booking_customer(x.c, int(id), "quote")
     return dict(ok=True)
 
 @route("POST", "/api/bookings/<id>/quote-response")
@@ -423,7 +498,11 @@ def quote_response(x, id):
 def contact(x):
     need(not rate_limited("contact:" + x.ip, 5, 3600), "Too many messages. Try again later.", 429)
     email = s(x.body.get("email"), 120, "Email"); need(EMAIL_RE.match(email), "Enter a valid email address")
-    x.c.execute("INSERT INTO messages(name,email,message,created) VALUES(?,?,?,?)", (s(x.body.get("name"), 80, "Name"), email, s(x.body.get("message"), 1500, "Message"), now()))
+    name = s(x.body.get("name"), 80, "Name")
+    message = s(x.body.get("message"), 1500, "Message")
+    x.c.execute("INSERT INTO messages(name,email,message,created) VALUES(?,?,?,?)", (name, email, message, now()))
+    if CONTACT_EMAIL:
+        queue_email(CONTACT_EMAIL, f"Heeben website message from {name}", f"From: {name} <{email}>\n\n{message}\n")
     return dict(ok=True)
 
 # ---------- seed ----------
@@ -470,14 +549,17 @@ class Handler(BaseHTTPRequestHandler):
         data = body if isinstance(body, bytes) else json.dumps(body).encode()
         self.send_response(code)
         self.send_header("Content-Type", ctype); self.send_header("Content-Length", str(len(data)))
-        self.send_header("X-Content-Type-Options", "nosniff"); self.send_header("Referrer-Policy", "same-origin")
+        self.send_header("X-Content-Type-Options", "nosniff"); self.send_header("Referrer-Policy", "strict-origin-when-cross-origin")
+        self.send_header("X-Frame-Options", "DENY"); self.send_header("Permissions-Policy", "geolocation=(self)")
         self.send_header("Content-Security-Policy", CSP)
+        if self.headers.get("X-Forwarded-Proto", "").lower() == "https":
+            self.send_header("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
         if ctype == "application/json": self.send_header("Cache-Control", "no-store")
         for k, v in (extra or []): self.send_header(k, v)
         self.end_headers(); self.wfile.write(data)
 
     def cookie_hdr(self, tok, clear=False):
-        secure = "; Secure" if self.headers.get("X-Forwarded-Proto") == "https" else ""
+        secure = "; Secure" if self.headers.get("X-Forwarded-Proto", "").lower() == "https" else ""
         return ("Set-Cookie", f"hb_session={'' if clear else tok}; Path=/; HttpOnly; SameSite=Lax; Max-Age={0 if clear else SESSION_DAYS*86400}{secure}")
 
     def handle_api(self, method):
@@ -489,7 +571,9 @@ class Handler(BaseHTTPRequestHandler):
                 body = {}
                 if method in ("POST", "PUT"):
                     need((self.headers.get("Content-Type") or "").startswith("application/json"), "Content-Type must be application/json", 415)
-                    n = int(self.headers.get("Content-Length") or 0); need(n <= MAX_BODY, "Request too large", 413)
+                    try: n = int(self.headers.get("Content-Length") or 0)
+                    except ValueError: raise ApiError(400, "Invalid Content-Length")
+                    need(0 <= n <= MAX_BODY, "Request too large", 413)
                     try: body = json.loads(self.rfile.read(n) or b"{}")
                     except Exception: raise ApiError(400, "Invalid JSON")
                     need(isinstance(body, dict), "Invalid JSON")
@@ -516,17 +600,32 @@ class Handler(BaseHTTPRequestHandler):
             c.rollback(); sys.stderr.write(f"ERROR {type(e).__name__}: {e}\n"); self.send(500, dict(error="Something went wrong. Please try again."))
         finally: c.close()
 
-    def static(self):
+    def static(self, head=False):
         p = urlparse(self.path).path
+        if p == "/healthz":
+            return self.send(200, b"ok", "text/plain; charset=utf-8", [("Cache-Control", "no-store")])
         f = (PUBLIC / ("index.html" if p == "/" else p.lstrip("/"))).resolve()
-        if not str(f).startswith(str(PUBLIC)) or not f.is_file(): f = PUBLIC / "index.html"  # SPA fallback
+        try: f.relative_to(PUBLIC.resolve())
+        except ValueError: f = PUBLIC / "index.html"
+        if not f.is_file(): f = PUBLIC / "index.html"  # SPA fallback
         extra = [("Cache-Control", "no-cache")]
-        self.send(200, f.read_bytes(), MIME.get(f.suffix, "application/octet-stream"), extra)
+        data = f.read_bytes()
+        if head:
+            self.send_response(200)
+            self.send_header("Content-Type", MIME.get(f.suffix, "application/octet-stream"))
+            self.send_header("Content-Length", str(len(data)))
+            self.send_header("Cache-Control", "no-cache")
+            self.send_header("X-Content-Type-Options", "nosniff")
+            self.end_headers()
+        else:
+            self.send(200, data, MIME.get(f.suffix, "application/octet-stream"), extra)
 
     def do_GET(self):
         if self.path.startswith("/api/"): self.handle_api("GET")
         else: self.static()
-    def do_HEAD(self): self.do_GET()
+    def do_HEAD(self):
+        if self.path.startswith("/api/"): self.handle_api("GET")
+        else: self.static(head=True)
     def do_POST(self): self.handle_api("POST") if self.path.startswith("/api/") else self.send(405, dict(error="Method not allowed"))
     def do_PUT(self): self.handle_api("PUT") if self.path.startswith("/api/") else self.send(405, dict(error="Method not allowed"))
     def do_DELETE(self): self.handle_api("DELETE") if self.path.startswith("/api/") else self.send(405, dict(error="Method not allowed"))
@@ -535,4 +634,10 @@ if __name__ == "__main__":
     init_db()
     host, port = os.environ.get("HOST", "0.0.0.0"), int(os.environ.get("PORT", 8000))
     print(f"Heeben running on http://localhost:{port}")
-    ThreadingHTTPServer((host, port), Handler).serve_forever()
+    print("Demo listings are OFF. Set HEEBEN_DEMO=1 only for local demonstrations.")
+    server = ThreadingHTTPServer((host, port), Handler)
+    server.daemon_threads = True
+    server.allow_reuse_address = True
+    try: server.serve_forever()
+    except KeyboardInterrupt: print("\nShutting down Heeben...")
+    finally: server.server_close()

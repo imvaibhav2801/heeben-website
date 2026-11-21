@@ -1,17 +1,11 @@
-# Putting Heeben on heeben.com
+# Deploy Heeben for account and booking testing
 
-1. Create a free GitHub account and upload this `site` folder as a new repository.
-2. Create a Render account (render.com) -> New -> Blueprint -> pick the repo. It reads `render.yaml` and builds the Dockerfile.
-   (Fly.io or Railway also work: they need a volume mounted at /data so the SQLite database survives restarts.)
-3. In Render: your service -> Settings -> Custom Domains -> add `heeben.com` and `www.heeben.com`.
-   Render shows the DNS records to create.
-4. At your domain registrar's DNS settings add exactly those records (usually an A record for heeben.com and a CNAME for www).
-   HTTPS is issued automatically after DNS propagates (minutes to a few hours). GPS only works over HTTPS.
-5. Open https://heeben.com, sign up as a garage owner, and list real garages. `HEEBEN_DEMO=0` means no demo account or sample garages are created.
-6. Back up /data/heeben.db regularly.
+1. Upload the contents of this project folder to the GitHub repository connected to Vercel.
+2. Create a Render Web Service from the same repository. The included `render.yaml` uses the free plan.
+3. Wait for deployment and confirm `/healthz` returns `ok`.
+4. Copy the real Render service origin, e.g. `https://your-service.onrender.com`.
+5. In Vercel → Settings → Environment Variables, create `HEEBEN_API_URL` with that exact origin (no trailing slash).
+6. Redeploy Vercel after saving the variable.
+7. Test `/api/me`, then create a new account on the live site.
 
-## Booking feature update
-
-The booking flow is integrated into the existing customer and garage-owner areas. Customers can select a garage service, vehicle, date, available slot and visit/pickup option, then track the request under **Bookings**. Garage owners manage requests from **My garage → Booking management**.
-
-Bookings now receive a reference such as `HB-261117-000001`, and save a snapshot of the garage's listed starting price at the time the request is made. Existing SQLite databases are migrated automatically to add this price snapshot column; existing accounts, garages and bookings are preserved. Booking dates are limited to the next 30 days, and past time slots on the current day are disabled.
+The free Render plan is for initial testing only. Its local SQLite database is ephemeral; users/bookings can be lost after a restart or redeploy. Configure durable storage before public production use.
