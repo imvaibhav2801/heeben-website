@@ -25,7 +25,7 @@ function locationQuery(area) {
   return `${clean}, ${city}, India`;
 }
 initCitySelectors();
-const VIEWS = ['home','services','cart','prices','extras','garages','dashboard','assistant','bookings','account','garage','how','contact','legal'];
+const VIEWS = ['home','services','cart','prices','extras','garages','dashboard','assistant','bookings','account','garage','how','founder','contact','legal'];
 
 /* ---------- API ---------- */
 async function api(path, method = 'GET', body) {
