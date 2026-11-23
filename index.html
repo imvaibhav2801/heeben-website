@@ -19,10 +19,10 @@
     <button class="nav-link" data-view="dashboard" id="navDashboard">My dashboard</button>
     <button class="nav-link" data-view="assistant" id="navAssistant">AI assistant</button>
     <button class="nav-link" data-view="bookings" id="navBookings">My bookings</button>
-    <button class="nav-link" data-view="founder">About the founder</button>
     <button class="nav-link" data-view="extras">More care</button>
     <button class="nav-link" data-view="how">How it works</button>
     <button class="nav-link" data-view="garage" id="navGarage">For garages</button>
+    <button class="nav-link" data-view="founder">About founder</button>
   </nav>
   <div class="header-actions"><button class="btn btn-cart" data-view="cart" aria-label="View cart">🛒 Cart <span class="cart-count" id="cartCount">0</span></button><button class="btn btn-quiet" id="loginBtn">Log in</button><button class="btn btn-navy" id="signupBtn">Sign up <span aria-hidden="true">↗</span></button></div>
 </header>
@@ -133,38 +133,6 @@
   <div class="section extra-disclaimer"><p class="hint"><b>Important:</b> These are enquiry and discovery options in this MVP, not a promise of 24×7 dispatch, insurance underwriting, cashless claim approval, parts inventory, or a platform-backed warranty. Heeben will confirm availability with a participating provider before anything is booked.</p></div>
 </section>
 
-<section class="view" id="founder">
-  <div class="founder-hero">
-    <p class="eyebrow">THE PERSON BEHIND HEEBEN</p>
-    <h1>Built on an idea.<br><em>Driven by a vision.</em></h1>
-    <p class="founder-intro">A young founder exploring how technology and entrepreneurship can make everyday vehicle care simpler, smarter and more accessible.</p>
-  </div>
-  <div class="section founder-content">
-    <div class="founder-profile panel">
-      <div class="founder-monogram" aria-hidden="true">VA</div>
-      <div><p class="eyebrow">FOUNDER</p><h2>Vaibhav Agarwal</h2><p class="founder-role">Founder, Heeben</p>
-      <p class="muted">First-year B.Tech student in Artificial Intelligence and Data Science at IIIT Bangalore.</p>
-<div class="founder-contact">
-<p class="eyebrow">GET IN TOUCH</p>
-<a href="tel:+918669174054">+91 86691 74054</a>
-<a href="mailto:agarwalvaibhav2801@gmail.com">agarwalvaibhav2801@gmail.com</a>
-</div></div>
-</div>
-<div class="founder-story-grid">
-      <article class="panel"><p class="eyebrow">MY JOURNEY</p><h2>Curiosity to creation.</h2><p>I'm interested in entrepreneurship, technology and building things that solve real-world problems. I enjoy looking at everyday challenges, understanding where existing experiences fall short, and exploring how thoughtful ideas can become useful products.</p><p>Heeben is one step in that journey: an opportunity to learn by building, listening to customers and working with service partners.</p></article>
-      <article class="panel"><p class="eyebrow">OUR VISION</p><h2>Vehicle care, made easier.</h2><p>Heeben aims to make vehicle ownership and maintenance simpler, more transparent and accessible. We are starting by helping customers discover local garages and send booking requests, while giving service providers a digital way to reach nearby customers.</p><p>Over time, the vision is to build a comprehensive vehicle-care ecosystem across cars, two-wheelers and other vehicle categories.</p></article>
-    </div>
-    <div class="founder-belief"><p class="eyebrow">THE BIGGER PICTURE</p><h2>Building beyond a booking platform.</h2><p>The goal is to create a trusted place that connects vehicle owners with the services, people and solutions they need throughout their ownership journey.</p><p class="founder-tagline">We Care Beyond the Drive.</p></div>
-  </div>
-</section>
-
-<section class="view" id="prices">
-  <div class="page-head"><p class="eyebrow">KNOW BEFORE YOU BOOK</p><h1>What vehicle care<br><em>usually costs in India.</em></h1><p>Typical 2026 price ranges for cars. Garages set their own prices, so use this as a guide and confirm with the garage.</p></div>
-  <div class="section"><div class="vehicle-select" id="sizeToggle" role="group" aria-label="Car size"><button class="vehicle-option selected" data-size="h"><b>Hatchback</b></button><button class="vehicle-option" data-size="s"><b>Sedan</b></button><button class="vehicle-option" data-size="u"><b>SUV</b></button></div>
-  <div id="priceBody" class="price-groups"></div>
-  <p class="hint">Estimates compiled from published 2026 Indian price guides. Metro cities (Mumbai, Bengaluru, Delhi) typically run 10–25% higher than smaller cities. Premium and imported cars cost more. Two-wheeler and EV prices are not covered here.</p></div>
-</section>
-
 <section class="view" id="garages">
   <div class="page-head"><p class="eyebrow">LOCAL VEHICLE-CARE PROFESSIONALS</p><h1>Find a garage<br><em>you can count on.</em></h1><p>Search by area, service or vehicle, then send a booking request.</p></div>
   <div class="section"><div class="filterbar"><input id="garageSearch" placeholder="Search garage or area..." aria-label="Search garages"><select id="garageService" aria-label="Service"><option value="">All services</option></select><select id="garageVehicle" aria-label="Vehicle"><option value="">All vehicles</option></select><select id="garageSort" aria-label="Sort garages"><option value="recommended">Recommended</option><option value="rating">Highest rated</option><option value="price">Lowest starting price</option><option value="distance">Nearest first</option></select></div>
@@ -203,6 +171,8 @@
   <div class="section steps"><article><b>01</b><div><h2>Choose what you need</h2><p>Start with your vehicle type and the service you're looking for.</p></div></article><article><b>02</b><div><h2>Explore local options</h2><p>Compare garages by service, starting price, rating and distance.</p></div></article><article><b>03</b><div><h2>Request a time slot</h2><p>Pick an available slot and whether you'd prefer pickup or to visit the garage. The garage confirms or declines.</p></div></article><article><b>04</b><div><h2>Get it done and review</h2><p>Pay the garage directly. After the garage marks the job complete, share your feedback.</p></div></article></div>
 </section>
 
+
+
 <section class="view" id="contact">
   <div class="page-head compact"><p class="eyebrow">GET IN TOUCH</p><h1>Contact us.</h1><p>Questions, feedback or partnership ideas? We read every message.</p></div>
   <div class="section"><div class="panel narrow"><form id="contactForm" class="stack-form"><label class="field">Name<input required id="contactName" maxlength="80"></label><label class="field">Email<input required type="email" id="contactEmail" maxlength="120"></label><label class="field">Message<textarea required id="contactMessage" rows="5" maxlength="1500"></textarea></label><button class="btn btn-navy">Send message</button></form></div></div>
@@ -218,8 +188,26 @@
     <p class="hint">This is a starter policy. Have it reviewed by a lawyer before public launch.</p>
   </div></div>
 </section>
+
+<section class="view" id="founder">
+  <div class="founder-hero">
+    <div class="founder-copy">
+      <p class="eyebrow">THE PERSON BEHIND HEEBEN</p>
+      <h1>Built on an idea.<br><em>Driven by a vision.</em></h1>
+      <p class="founder-lead">A young founder’s journey to make vehicle care simpler, smarter and more accessible.</p>
+      <div class="founder-name-block"><span class="founder-monogram">VA</span><div><h2>Vaibhav Agarwal</h2><p>Founder, Heeben</p></div></div>
+      <p class="founder-education">First-year B.Tech student in Artificial Intelligence and Data Science at IIIT Bangalore.</p>
+    </div>
+    <div class="founder-art" aria-label="Heeben founder profile graphic"><div class="founder-orbit orbit-one"></div><div class="founder-orbit orbit-two"></div><div class="founder-mark">H<span>.</span></div><p>IDEAS INTO IMPACT</p></div>
+  </div>
+  <div class="section founder-content">
+    <article class="founder-story panel"><p class="eyebrow">A LITTLE ABOUT ME</p><h2>Curiosity, technology<br>and the drive to build.</h2><p>I’m Vaibhav, a first-year engineering student with a strong interest in technology, entrepreneurship and building solutions to real-world problems. I believe meaningful businesses begin by understanding everyday challenges and finding better ways to solve them.</p><p>Heeben started with a simple thought: taking care of a vehicle should not feel complicated. Finding the right service, understanding the options and connecting with a dependable service provider should be easier for every vehicle owner.</p></article>
+    <article class="founder-vision panel"><p class="eyebrow">THE VISION FOR HEEBEN</p><h2>Care that goes beyond the drive.</h2><p>Heeben is being built with the ambition to create a simpler, smarter and more accessible vehicle-care experience. The long-term vision is a connected ecosystem that brings vehicle owners, trusted service providers and useful automotive solutions closer together.</p><p>We’re starting with the essentials, learning from customers and service partners, and improving one step at a time. The goal is to build something useful, dependable and worthy of people’s trust.</p><div class="founder-tagline">“We Care Beyond the Drive.”</div></article>
+  </div>
+  <div class="section founder-contact"><div><p class="eyebrow">LET’S CONNECT</p><h2>Ideas grow through conversations.</h2><p class="muted">For questions, collaborations or partnership discussions, feel free to reach out.</p></div><div class="founder-contact-links"><a href="mailto:agarwalvaibhav2801@gmail.com"><span>EMAIL</span><b>agarwalvaibhav2801@gmail.com</b> ↗</a><a href="tel:+918669174054"><span>PHONE</span><b>+91 86691 74054</b> ↗</a></div></div>
+</section>
 </main>
-<footer><a class="brand" href="#home" data-view="home">heeben<span>.</span></a><p>We Care Beyond the Drive.</p><div><button data-go="services">Services</button><button data-go="founder">About the founder</button><button data-go="extras">More care</button><button data-go="garages">Find a garage</button><button data-go="partners">Partner with us</button><button data-go="contact">Contact</button><button data-go="legal">Terms &amp; privacy</button></div><small>© 2026 Heeben.</small></footer>
+<footer><a class="brand" href="#home" data-view="home">heeben<span>.</span></a><p>We Care Beyond the Drive.</p><div><button data-go="services">Services</button><button data-go="founder">About founder</button><button data-go="extras">More care</button><button data-go="garages">Find a garage</button><button data-go="partners">Partner with us</button><button data-go="contact">Contact</button><button data-go="legal">Terms &amp; privacy</button></div><small>© 2026 Heeben.</small></footer>
 
 <div class="modal-backdrop" id="authModal" role="dialog" aria-modal="true" aria-labelledby="authTitle"><div class="modal"><button class="modal-close" data-close aria-label="Close">×</button><p class="eyebrow">WELCOME TO HEEBEN</p><h2 id="authTitle">Create your account.</h2>
 <form id="authForm" class="stack-form">
@@ -242,6 +230,7 @@
 <div class="field">Time slot<div class="slot-grid" id="slotGrid" role="radiogroup" aria-label="Time slot"></div></div>
 <label class="field">Tell the garage what you need (optional)<textarea id="bookingNotes" rows="3" maxlength="400" placeholder="Briefly describe the issue or service you need..."></textarea></label>
 <div class="two-fields"><label class="field">Service option<select id="bookingMode"></select></label><label class="field">Phone number<input id="bookingPhone" type="tel" maxlength="18" placeholder="So the garage can reach you" required></label></div>
+<label class="field" id="doorstepAddressWrap" hidden>Doorstep service address<input id="doorstepAddress" maxlength="240" placeholder="House / building, street, area and PIN code"></label><p class="hint" id="doorstepAvailabilityHint" hidden>Doorstep requests depend on the selected garage’s service area and availability. The garage must confirm your request.</p>
 <button class="btn btn-navy" id="bookingSubmit">Send booking request</button><p class="hint form-msg" id="bookingMessage" role="alert"></p>
 <p class="hint">The garage will confirm or decline your request. You pay the garage directly after the service.</p></form></div></div>
 
@@ -251,7 +240,6 @@
 <div class="modal-backdrop" id="noteModal" role="dialog" aria-modal="true" aria-label="Respond to request"><div class="modal"><button class="modal-close" data-close aria-label="Close">×</button><p class="eyebrow">BOOKING REQUEST</p><h2 id="noteTitle">Update request.</h2><form id="noteForm" class="stack-form"><input type="hidden" id="noteBookingId"><input type="hidden" id="noteStatus"><label class="field">Message to customer (optional)<textarea id="noteText" rows="3" maxlength="300" placeholder="e.g. Please arrive 10 minutes early."></textarea></label><button class="btn btn-navy" id="noteSubmit">Confirm</button></form></div></div>
 
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
-<script src="prices.js"></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
 <script src="fallback.js"></script>
 <script src="app.js"></script>

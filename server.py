@@ -40,7 +40,7 @@ SERVICE_GROUPS = {
 SERVICES = [service for group in SERVICE_GROUPS.values() for service in group]
 VEHICLES = ["Car", "Two-wheeler", "Electric vehicle", "Commercial vehicle"]
 SLOTS = ["09:00 AM", "11:00 AM", "02:00 PM", "04:00 PM"]
-MODES = ["Visit garage", "Pickup requested (subject to availability)"]
+MODES = ["Visit garage", "Pickup requested (subject to availability)", "Doorstep service requested (subject to availability)"]
 SESSION_DAYS = 30
 MAX_BODY = 64 * 1024
 

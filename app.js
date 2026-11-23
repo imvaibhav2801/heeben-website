@@ -25,7 +25,7 @@ function locationQuery(area) {
   return `${clean}, ${city}, India`;
 }
 initCitySelectors();
-const VIEWS = ['home','services','cart','prices','extras','garages','dashboard','assistant','bookings','account','garage','how','founder','contact','legal'];
+const VIEWS = ['home','services','cart','extras','garages','dashboard','assistant','bookings','account','garage','how','contact','legal','founder'];
 
 /* ---------- API ---------- */
 async function api(path, method = 'GET', body) {
@@ -61,7 +61,7 @@ function show(view) {
   $('#mainNav').classList.remove('open'); $('#mobileMenu').setAttribute('aria-expanded', 'false');
   window.scrollTo({top: 0});
   document.title = (view === 'home' ? '' : view.charAt(0).toUpperCase() + view.slice(1) + ' · ') + 'Heeben — We Care Beyond the Drive';
-  ({home: renderHome, services: renderServices, cart: renderCart, prices: renderPrices, garages: loadGarages, dashboard: renderCustomerDashboard, assistant: renderAssistant, bookings: renderBookings, account: renderAccount, garage: renderGarageDash}[view] || (() => {}))();
+  ({home: renderHome, services: renderServices, cart: renderCart, garages: loadGarages, dashboard: renderCustomerDashboard, assistant: renderAssistant, bookings: renderBookings, account: renderAccount, garage: renderGarageDash}[view] || (() => {}))();
 }
 window.addEventListener('hashchange', () => show(location.hash.slice(1) || 'home'));
 
@@ -446,14 +446,6 @@ function renderCart() {
 }
 saveCart();
 
-let priceSize = 'h';
-function renderPrices() {
-  $$('#sizeToggle [data-size]').forEach(b => b.classList.toggle('selected', b.dataset.size === priceSize));
-  $('#priceBody').innerHTML = PRICE_GUIDE.map(g => `<div class="panel price-group"><div class="price-group-head"><div><h3>${g.icon} &nbsp;${esc(g.title)}</h3><p class="muted">${esc(g.note)}</p></div><button class="btn btn-outline" data-service="${esc(g.service)}">Find garages ↗</button></div>
-    <ul class="price-list">${g.items.map(i => { const r = i[priceSize] || i.all; const val = i.text || `${LAKH(r[0])} – ${LAKH(r[1])}${i.plus ? '+' : ''}`; return `<li><span>${esc(i.name)}</span><b>${esc(val)}</b></li>`; }).join('')}</ul></div>`).join('');
-}
-$('#sizeToggle').addEventListener('click', e => { const b = e.target.closest('[data-size]'); if (b) { priceSize = b.dataset.size; renderPrices(); } });
-
 /* ---------- location ---------- */
 let coordsSource = null, gpsArea = '', locating = false;
 const GEO_KEY = 'hb_loc';
@@ -559,12 +551,15 @@ async function openBooking(id, svc) {
   $('#bookingVehicleType').innerHTML = meta.vehicles.map(v => `<option>${esc(v)}</option>`).join('');
   $('#bookingVehicleNewWrap').style.display = myVehicles.length ? 'none' : ''; $('#bookingVehicleNew').value = ''; if (myVehicles.length) $('#bookingVehicleType').value = myVehicles[0].type;
   $('#bookingMode').innerHTML = meta.modes.map(m => `<option>${esc(m)}</option>`).join('');
+  $('#doorstepAddress').value = ''; updateDoorstepFields();
   $('#bookingDate').min = todayStr(); const maxDate = new Date(); maxDate.setDate(maxDate.getDate() + 30); $('#bookingDate').max = new Date(maxDate - maxDate.getTimezoneOffset() * 60000).toISOString().slice(0, 10); $('#bookingDate').value = todayStr(); $('#bookingNotes').value = ''; $('#bookingPhone').value = me.phone || ''; $('#bookingMessage').textContent = '';
   openModal('bookingModal'); loadSlots();
 }
 $('#bookingVehicleSel').onchange = () => { const isNew = $('#bookingVehicleSel').value === '__new'; $('#bookingVehicleNewWrap').style.display = isNew ? '' : 'none'; if (!isNew) $('#bookingVehicleType').value = $('#bookingVehicleSel').selectedOptions[0]?.dataset.type || meta.vehicles[0]; };
 function updateBookingEstimate() { const chosen = bookingCtx?.garage?.services?.find(x => x.service === $('#bookingService').value); $('#bookingEstimatePrice').textContent = chosen ? 'From ' + money(chosen.price) : '—'; }
 $('#bookingService').onchange = updateBookingEstimate;
+$('#bookingMode').addEventListener('change', updateDoorstepFields);
+function updateDoorstepFields() { const doorstep = $('#bookingMode')?.value?.startsWith('Doorstep service'); if ($('#doorstepAddressWrap')) $('#doorstepAddressWrap').hidden = !doorstep; if ($('#doorstepAvailabilityHint')) $('#doorstepAvailabilityHint').hidden = !doorstep; $('#doorstepAddress').required = !!doorstep; }
 async function loadSlots() {
   const grid = $('#slotGrid'), d = $('#bookingDate').value; bookingCtx.slot = null;
   if (!d) { grid.innerHTML = ''; return; }
@@ -580,10 +575,12 @@ $('#bookingForm').onsubmit = async e => {
   e.preventDefault(); const msg = $('#bookingMessage'); msg.textContent = '';
   const sel = $('#bookingVehicleSel').value, vehicle = (sel === '__new' || !myVehicles.length) ? $('#bookingVehicleNew').value.trim() : sel, vehicleType = $('#bookingVehicleType').value;
   if (!vehicle) return msg.textContent = 'Please enter your vehicle model.';
+  if ($('#bookingMode').value.startsWith('Doorstep service') && !$('#doorstepAddress').value.trim()) return msg.textContent = 'Please enter the address for the doorstep request.';
   if (!bookingCtx.slot) return msg.textContent = 'Please choose a time slot.';
   const btn = $('#bookingSubmit'); btn.disabled = true;
   try {
-    const created = await api('/bookings', 'POST', {garage_id: bookingCtx.garage.id, service: $('#bookingService').value, vehicle, vehicle_type: vehicleType, date: $('#bookingDate').value, time: bookingCtx.slot, mode: $('#bookingMode').value, notes: $('#bookingNotes').value.trim(), phone: $('#bookingPhone').value.trim()});
+    const bookingNotes = [$('#bookingNotes').value.trim(), $('#bookingMode').value.startsWith('Doorstep service') ? `Doorstep address: ${$('#doorstepAddress').value.trim()}` : ''].filter(Boolean).join('\n');
+    const created = await api('/bookings', 'POST', {garage_id: bookingCtx.garage.id, service: $('#bookingService').value, vehicle, vehicle_type: vehicleType, date: $('#bookingDate').value, time: bookingCtx.slot, mode: $('#bookingMode').value, notes: bookingNotes, phone: $('#bookingPhone').value.trim()});
     if (me && !me.phone) me.phone = $('#bookingPhone').value.trim();
     closeModals(); toast(`Request ${created.booking_ref} sent! The garage will confirm shortly.`); go('bookings'); if (location.hash === '#bookings') renderBookings();
   } catch (err) { msg.textContent = err.message; if (err.status === 409) loadSlots(); } finally { btn.disabled = false; }
@@ -676,6 +673,7 @@ async function renderGarageDash() {
   el.innerHTML = `<div class="stats"><div><b>${pending}</b><small>New requests</small></div><div><b>${upcoming}</b><small>Upcoming jobs</small></div><div><b>${done}</b><small>Completed</small></div><div><b>${ownerGarages.length}</b><small>Garages listed</small></div></div>
   <div class="dashboard-grid"><div class="stack-col"><div class="panel"><p class="eyebrow">BOOKING MANAGEMENT</p><h2>Requests.</h2><div class="tabs" id="ownerTabs"></div><div id="partnerBookings" class="booking-list"></div></div></div>
   <div class="stack-col"><div class="panel"><p class="eyebrow">YOUR GARAGES</p>${ownerGarages.length ? ownerGarages.map(x => `<div class="vehicle-row"><span><b>${esc(x.name)}</b><small>${esc(x.area)} · ${x.active ? 'Live' : 'Hidden'}${x.is_sample ? ' · Sample' : ''}</small></span><span class="card-btns"><button class="btn btn-outline" data-action="editGarage" data-id="${x.id}">Edit</button><button class="btn btn-quiet" data-action="toggleGarage" data-id="${x.id}">${x.active ? 'Hide' : 'Show'}</button></span></div>`).join('') : '<p class="muted">You have not listed a garage yet. Use the form below.</p>'}</div>
+  <div class="panel"><p class="eyebrow">HEEBEN REWARDS</p><h2>Verify a customer voucher.</h2><p class="muted">Enter the customer’s single-use Heeben voucher code before applying the discount to their service bill.</p><form id="rewardVerifyForm" class="stack-form"><label class="field">Voucher code<input id="rewardVoucherCode" maxlength="20" autocomplete="off" placeholder="e.g. HB12AB34CD" required></label><button class="btn btn-navy">Verify voucher</button><p class="hint form-msg" id="rewardVerifyMessage" role="status"></p></form></div>
   <div class="panel"><p class="eyebrow">${g ? 'EDIT GARAGE' : 'LIST A GARAGE'}</p><h2>${g ? esc(g.name) : 'Add your garage.'}</h2>
   <form id="garageForm" class="stack-form"><label class="field">Garage name<input required id="gName" maxlength="80" value="${esc(g?.name)}"></label>
   <label class="field">Area / city<input required id="gArea" maxlength="120" placeholder="e.g. Indiranagar, Bengaluru" value="${esc(g?.area)}"></label>
@@ -687,6 +685,20 @@ async function renderGarageDash() {
   <input type="hidden" id="gLat" value="${g?.lat ?? ''}"><input type="hidden" id="gLng" value="${g?.lng ?? ''}">
   <div class="btn-row"><button class="btn btn-navy">${g ? 'Save changes' : 'List my garage'}</button>${g ? '<button type="button" class="btn btn-quiet" data-action="newGarage">Cancel</button>' : ''}</div><p class="hint form-msg" id="garageMsg" role="alert"></p></form></div></div></div>`;
   renderOwnerBookings();
+  $('#rewardVerifyForm').onsubmit = async e => {
+    e.preventDefault();
+    const msg = $('#rewardVerifyMessage');
+    const btn = $('#rewardVerifyForm button');
+    msg.textContent = '';
+    btn.disabled = true;
+    try {
+      const result = await api('/owner/rewards/verify', 'POST', {code: $('#rewardVoucherCode').value.trim().toUpperCase()});
+      msg.textContent = `Valid voucher. Apply ${money(result.discount_amount)} off the customer’s service bill.`;
+      $('#rewardVoucherCode').value = '';
+      toast('Voucher verified successfully.');
+    } catch (er) { msg.textContent = er.message || 'Could not verify this voucher.'; }
+    finally { btn.disabled = false; }
+  };
   $('#garageForm').onsubmit = async e => {
     e.preventDefault(); const msg = $('#garageMsg'); msg.textContent = '';
     const services = $$('input[name=gSvc]:checked').map(c => ({service: c.value, price: $(`[data-price="${CSS.escape(c.value)}"]`).value}));

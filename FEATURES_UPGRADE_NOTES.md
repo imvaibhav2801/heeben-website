@@ -30,3 +30,14 @@ All checks passed on the packaged source.
 - Garage owners can verify a voucher from the owner API; verification marks it Used and returns the discount amount. The garage must apply that discount to the service bill manually.
 - The `reward_redemptions` table is created automatically by the server schema on startup. Existing reward balances are preserved.
 - Automated smoke test covers earning, redeeming, voucher verification, and rejecting reuse of a voucher.
+
+
+## About the Founder page (23 Nov 2026)
+- Replaced the Price guide navigation item with About founder.
+- Added a responsive founder page for Vaibhav Agarwal, Founder of Heeben, including the requested IIIT Bangalore AI & Data Science student description.
+- Added the headline “Built on an idea. Driven by a vision.” and Heeben tagline “We Care Beyond the Drive.”
+- Added mailto and telephone contact links.
+- Removed the former Price guide view and its front-end renderer from the navigation flow.
+
+- Added a doorstep service request mode to the booking flow. Customers can enter a service address; the request is explicitly subject to garage coverage and confirmation. This is a request workflow, not a promise of guaranteed doorstep dispatch.
+- The online store remains a separate Heeben-branded website concept and is not embedded in this marketplace ZIP. A store URL/catalogue was not supplied, so no unverified external link was added.
