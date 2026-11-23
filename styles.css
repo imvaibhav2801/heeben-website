@@ -406,3 +406,18 @@ footer small{width:100%;color:#87929c;font-size:10px}
 
 /* Heeben Rewards */
 .reward-offers{display:grid;gap:10px;margin:16px 0}.reward-offer{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px;border:1px solid var(--line);border-radius:12px;background:#fff}.reward-offer>div{display:grid;gap:4px}.reward-offer b{font:700 17px Manrope;color:var(--ink)}.reward-offer small{font-size:11px;color:var(--muted)}.reward-subhead{font:700 14px Manrope;margin:20px 0 10px}.reward-voucher{align-items:center}.reward-voucher small{display:block}.reward-debit{color:#a33b32}
+
+
+/* About the founder */
+.founder-hero{display:grid;grid-template-columns:1.2fr .8fr;gap:40px;align-items:center;padding:78px clamp(22px,7vw,110px);background:linear-gradient(115deg,#f7f3eb,#e9edf0);border-bottom:1px solid var(--line)}
+.founder-copy{max-width:760px}.founder-copy h1{font:800 clamp(42px,5.5vw,68px)/1.02 Manrope,sans-serif;letter-spacing:-3px;color:var(--ink);margin:0}.founder-copy h1 em{font-style:normal;color:#526b82}
+.founder-name{font:800 25px Manrope;margin:28px 0 4px;color:var(--navy)}.founder-role{font-size:13px;font-weight:700;color:#6b7885;margin:0 0 12px}.founder-education{font-size:13px;line-height:1.7;color:var(--muted);max-width:500px}
+.founder-mark{min-height:260px;border-radius:22px;background:var(--navy);color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:15px;position:relative;overflow:hidden}
+.founder-mark:before,.founder-mark:after{content:"";position:absolute;border:1px solid #ffffff22;border-radius:50%;width:260px;height:260px}.founder-mark:after{width:350px;height:350px}
+.founder-mark span{font:800 100px/1 Manrope;letter-spacing:-9px;color:#f4f0e8;z-index:1}.founder-mark small{font-size:9px;letter-spacing:2px;color:#c6d2df;z-index:1}
+.founder-content{display:grid;grid-template-columns:1fr 1fr;gap:50px 9%;align-items:start}
+.founder-story h2,.founder-vision h2,.founder-belief h2{font:800 clamp(27px,3vw,38px)/1.12 Manrope;letter-spacing:-1.3px;color:var(--navy);margin:0 0 17px}
+.founder-story p:not(.eyebrow),.founder-vision p:not(.eyebrow),.founder-belief p:not(.eyebrow){font-size:13px;line-height:1.9;color:var(--muted);margin:0 0 13px}
+.founder-belief{grid-column:1/-1;background:#e9edf0;border-radius:20px;padding:38px clamp(24px,5vw,60px);text-align:center}
+.founder-belief h2{max-width:650px;margin:0 auto 14px}.founder-belief p:not(.eyebrow){max-width:700px;margin:0 auto 20px}.founder-belief span{font:700 14px Manrope;color:var(--navy)}
+@media(max-width:700px){.founder-hero{grid-template-columns:1fr;padding:52px 22px;gap:25px}.founder-copy h1{letter-spacing:-2px}.founder-mark{min-height:190px}.founder-content{grid-template-columns:1fr;gap:34px}.founder-belief{grid-column:auto;padding:30px 22px}}
