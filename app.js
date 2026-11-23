@@ -85,8 +85,11 @@ function setUser(u) {
   $('#loginBtn').textContent = u ? 'Hi, ' + u.name.split(' ')[0] : 'Log in';
   $('#signupBtn').innerHTML = u ? 'Log out' : 'Sign up <span aria-hidden="true">↗</span>';
   $('#navBookings').style.display = u && u.role === 'owner' ? 'none' : '';
-  $('#navDashboard').style.display = u && u.role === 'customer' ? '' : 'none';
-  $('#navAssistant').style.display = u && u.role === 'customer' ? '' : 'none';
+  // Keep these navigation entries mounted for every visitor. Logged-out users
+  // can open the pages and receive the sign-in prompt instead of seeing the
+  // links flash briefly and then disappear after the session check.
+  $('#navDashboard').style.display = '';
+  $('#navAssistant').style.display = '';
   $('#navGarage').textContent = u && u.role === 'owner' ? 'My garage' : 'For garages';
 }
 $('#authForm').onsubmit = async e => {
@@ -622,14 +625,20 @@ async function renderCustomerDashboard() {
   if(me.role!=='customer') return gate(el,'Customer dashboard','Open your garage dashboard to manage customer bookings.','<button class="btn btn-navy" data-go="garage">Open garage dashboard</button>');
   el.innerHTML='<p class="muted">Loading your dashboard…</p>';
   try {
-    const [d,h,r]=await Promise.all([api('/dashboard'),api('/vehicle-history'),api('/rewards')]);
-    el.innerHTML=`<div class="stats"><div><b>${d.vehicles.length}</b><small>Saved vehicles</small></div><div><b>${d.upcoming}</b><small>Active bookings</small></div><div><b>${d.completed}</b><small>Completed services</small></div><div><b>${r.points}</b><small>Heeben points</small></div></div>
+    // Load each dashboard area independently. A temporary failure in vehicle
+    // history must not prevent rewards from appearing (and vice versa).
+    const [dResult,hResult,rResult]=await Promise.allSettled([api('/dashboard'),api('/vehicle-history'),api('/rewards')]);
+    if (dResult.status === 'rejected') throw dResult.reason;
+    const d=dResult.value;
+    const h=hResult.status === 'fulfilled' ? hResult.value : {history:[]};
+    const r=rResult.status === 'fulfilled' ? rResult.value : null;
+    el.innerHTML=`<div class="stats"><div><b>${d.vehicles.length}</b><small>Saved vehicles</small></div><div><b>${d.upcoming}</b><small>Active bookings</small></div><div><b>${d.completed}</b><small>Completed services</small></div><div><b>${r ? r.points : '—'}</b><small>Heeben points</small></div></div>
     <div class="dashboard-grid"><div class="stack-col"><div class="panel"><p class="eyebrow">VEHICLE PASSPORT</p><h2>Your vehicle history.</h2>${h.history.length?h.history.map(v=>`<div class="vehicle-row"><span><b>${esc(v.vehicle.model)}</b><small>${esc(v.vehicle.type)}${v.vehicle.reg?' · '+esc(v.vehicle.reg):''}</small></span><b>${v.records.length} records</b></div>${v.records.length?`<div class="booking-list">${v.records.map(b=>`<article class="booking-card"><div><h4>${esc(b.service)}</h4><p>${fmtDate(b.date)} · ${esc(b.garage_name)} · ${esc(b.garage_area)}</p><p>Status: <b>${esc(b.status)}</b>${b.quote_amount?' · Quote: '+money(b.quote_amount):''}</p>${b.health_report?`<p>${esc(b.health_report)}</p>`:''}</div></article>`).join('')}</div>`:'<p class="hint">No service records linked to this vehicle yet. Completed bookings will appear when the booking uses this saved vehicle model.</p>'}`).join(''):'<p class="muted">Add a vehicle in Profile & vehicles to start its passport.</p>'}</div>
     <div class="panel"><p class="eyebrow">BOOKING SNAPSHOT</p><h2>Recent activity.</h2>${d.bookings.slice(0,5).map(b=>`<div class="vehicle-row"><span><b>${esc(b.service)}</b><small>${esc(b.garage_name)} · ${fmtDate(b.date)}</small></span>${statusPill(b.status)}</div>`).join('')||'<p class="muted">No bookings yet.</p>'}<button class="btn btn-outline" data-view="bookings">View all bookings</button></div></div>
-    <div class="stack-col"><div class="panel"><p class="eyebrow">HEEBEN REWARDS</p><h2>${r.points} points</h2><p class="muted">Earn 10 points for each booking completed through Heeben. Redeem them for service discounts at participating Heeben garages.</p>
+    <div class="stack-col"><div class="panel"><p class="eyebrow">HEEBEN REWARDS</p>${r ? `<h2>${r.points} points</h2><p class="muted">Earn 10 points for each booking completed through Heeben. Redeem them for service discounts at participating Heeben garages.</p>
     <div class="reward-offers">${r.offers.map(o=>`<article class="reward-offer"><div><b>${esc(o.label)}</b><small>${o.points} points · ${esc(o.description)}</small></div><button class="btn btn-navy" data-action="redeemReward" data-points="${o.points}" ${r.points<o.points?'disabled':''}>Redeem</button></article>`).join('')}</div>
     ${r.redemptions.length?`<h3 class="reward-subhead">Your vouchers</h3>${r.redemptions.map(v=>`<div class="vehicle-row reward-voucher"><span><b>${money(v.discount_amount)} service discount</b><small>Code: <strong>${esc(v.code)}</strong> · ${esc(v.status)} · ${fmtDate(v.created.slice(0,10))}</small></span><button class="btn btn-outline" data-action="copyReward" data-code="${esc(v.code)}">Copy code</button></div>`).join('')}<p class="hint">Show an unused voucher to a participating Heeben garage before paying. Each voucher is single-use.</p>`:''}
-    <h3 class="reward-subhead">Points activity</h3>${r.transactions.map(t=>`<div class="vehicle-row"><span><b>${esc(t.reason)}</b><small>${fmtDate(t.created.slice(0,10))}</small></span><b class="${t.points<0?'reward-debit':''}">${t.points>0?'+':''}${t.points}</b></div>`).join('')||'<p class="hint">Your first completed service will earn points.</p>'}</div>
+    <h3 class="reward-subhead">Points activity</h3>${r.transactions.map(t=>`<div class="vehicle-row"><span><b>${esc(t.reason)}</b><small>${fmtDate(t.created.slice(0,10))}</small></span><b class="${t.points<0?'reward-debit':''}">${t.points>0?'+':''}${t.points}</b></div>`).join('')||'<p class="hint">Your first completed service will earn points.</p>'}` : `<p class="muted">Your rewards could not be loaded right now. Your bookings and vehicle dashboard are still available. Please refresh to try again.</p>`}</div>
     <div class="panel"><p class="eyebrow">QUICK ACTIONS</p><div class="btn-row"><button class="btn btn-navy" data-view="garages">Find a garage</button><button class="btn btn-outline" data-view="assistant">Ask vehicle assistant</button><button class="btn btn-outline" data-view="account">Manage vehicles</button></div></div></div></div>`;
   } catch(e){el.innerHTML=`<p class="muted">${esc(e.message)}</p>`;}
 }
