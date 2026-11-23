@@ -71,6 +71,12 @@ CREATE TABLE IF NOT EXISTS reminders(id INTEGER PRIMARY KEY, user_id INTEGER NOT
 CREATE TABLE IF NOT EXISTS saved(user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   garage_id INTEGER NOT NULL REFERENCES garages(id) ON DELETE CASCADE, PRIMARY KEY(user_id, garage_id));
 CREATE TABLE IF NOT EXISTS messages(id INTEGER PRIMARY KEY, name TEXT, email TEXT, message TEXT, created TEXT);
+CREATE TABLE IF NOT EXISTS reward_ledger(id INTEGER PRIMARY KEY, user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  booking_id INTEGER, points INTEGER NOT NULL, reason TEXT NOT NULL, created TEXT NOT NULL,
+  UNIQUE(user_id, booking_id, reason));
+CREATE TABLE IF NOT EXISTS reward_redemptions(id INTEGER PRIMARY KEY, user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  code TEXT NOT NULL UNIQUE, points INTEGER NOT NULL, discount_amount INTEGER NOT NULL, status TEXT NOT NULL DEFAULT 'Issued',
+  created TEXT NOT NULL, used TEXT DEFAULT '', garage_id INTEGER REFERENCES garages(id));
 """
 
 def db():
@@ -401,6 +407,97 @@ def add_reminder(x):
 @route("DELETE", "/api/reminders/<id>")
 def del_reminder(x, id): x.c.execute("DELETE FROM reminders WHERE id=? AND user_id=?", (id, x.auth()["id"])); return dict(ok=True)
 
+# --- customer dashboard, vehicle history and rewards ---
+@route("GET", "/api/dashboard")
+def customer_dashboard(x):
+    u = x.role("customer")
+    bookings = [booking_dict(x.c, b) for b in x.c.execute("SELECT * FROM bookings WHERE user_id=? ORDER BY date DESC,id DESC", (u["id"],))]
+    vehicles = [dict(r) for r in x.c.execute("SELECT id,type,model,reg FROM vehicles WHERE user_id=? ORDER BY id DESC", (u["id"],))]
+    points = x.c.execute("SELECT COALESCE(SUM(points),0) n FROM reward_ledger WHERE user_id=?", (u["id"],)).fetchone()["n"]
+    return dict(vehicles=vehicles, bookings=bookings, points=points,
+      upcoming=sum(1 for b in bookings if b["status"] in ("Requested","Confirmed") and b["date"] >= date.today().isoformat()),
+      completed=sum(1 for b in bookings if b["status"] == "Completed"),
+      reminders=[dict(r) for r in x.c.execute("SELECT id,text,date FROM reminders WHERE user_id=? ORDER BY date LIMIT 8", (u["id"],))])
+
+@route("GET", "/api/vehicle-history")
+def vehicle_history(x):
+    u = x.role("customer")
+    rows = [dict(r) for r in x.c.execute("SELECT id,type,model,reg FROM vehicles WHERE user_id=? ORDER BY id DESC", (u["id"],))]
+    history = []
+    for v in rows:
+        # Existing bookings store a vehicle label; match exact model or registration where present.
+        matches = x.c.execute("SELECT b.*,g.name garage_name,g.area FROM bookings b JOIN garages g ON g.id=b.garage_id WHERE b.user_id=? AND (LOWER(b.vehicle)=LOWER(?) OR (?<>'' AND UPPER(b.vehicle)=UPPER(?))) ORDER BY b.date DESC,b.id DESC", (u["id"], v["model"], v["reg"], v["reg"])).fetchall()
+        history.append(dict(vehicle=v, records=[dict(id=b["id"],service=b["service"],date=b["date"],status=b["status"],garage_name=b["garage_name"],garage_area=b["area"],quote_amount=b["quote_amount"],quote_status=b["quote_status"],health_report=b["health_report"],estimated_price=b["estimated_price"]) for b in matches]))
+    return dict(history=history)
+
+REWARD_OFFERS = [dict(points=100, discount_amount=50, label="₹50 off", description="Redeem 100 Heeben points"),
+                 dict(points=200, discount_amount=120, label="₹120 off", description="Redeem 200 Heeben points"),
+                 dict(points=500, discount_amount=350, label="₹350 off", description="Redeem 500 Heeben points")]
+
+@route("GET", "/api/rewards")
+def rewards(x):
+    u=x.role("customer")
+    return dict(points=x.c.execute("SELECT COALESCE(SUM(points),0) n FROM reward_ledger WHERE user_id=?",(u["id"],)).fetchone()["n"],
+      transactions=[dict(r) for r in x.c.execute("SELECT points,reason,created FROM reward_ledger WHERE user_id=? ORDER BY id DESC LIMIT 50",(u["id"],))],
+      offers=REWARD_OFFERS,
+      redemptions=[dict(code=r["code"],points=r["points"],discount_amount=r["discount_amount"],status=r["status"],created=r["created"],used=r["used"]) for r in x.c.execute("SELECT * FROM reward_redemptions WHERE user_id=? ORDER BY id DESC LIMIT 20",(u["id"],))],
+      rules=["Earn 10 points when a booking is marked completed.","Redeem points for a service discount voucher at a participating Heeben garage.","Vouchers are single-use and must be shown to the garage before payment."])
+
+@route("POST", "/api/rewards/redeem")
+def redeem_reward(x):
+    u=x.role("customer")
+    try: points=int(x.body.get("points",0))
+    except Exception: points=0
+    offer=next((o for o in REWARD_OFFERS if o["points"]==points),None)
+    need(offer, "Choose one of the available reward offers")
+    x.c.execute("BEGIN IMMEDIATE")
+    balance=x.c.execute("SELECT COALESCE(SUM(points),0) n FROM reward_ledger WHERE user_id=?",(u["id"],)).fetchone()["n"]
+    need(balance>=points, "You do not have enough points for this reward", 400)
+    code="HB"+secrets.token_hex(4).upper()
+    stamp=now()
+    x.c.execute("INSERT INTO reward_ledger(user_id,booking_id,points,reason,created) VALUES(?,NULL,?,?,?)",(u["id"],-points,"Redeemed for ₹%s service voucher" % offer["discount_amount"],stamp))
+    x.c.execute("INSERT INTO reward_redemptions(user_id,code,points,discount_amount,status,created) VALUES(?,?,?,?, 'Issued',?)",(u["id"],code,points,offer["discount_amount"],stamp))
+    return dict(ok=True,code=code,points=points,discount_amount=offer["discount_amount"],balance=balance-points)
+
+@route("POST", "/api/owner/rewards/verify")
+def verify_reward(x):
+    u=x.role("owner")
+    code=s(x.body.get("code"), 20, "Voucher code").upper()
+    garage=x.c.execute("SELECT id FROM garages WHERE owner_id=? AND active=1 ORDER BY id LIMIT 1",(u["id"],)).fetchone()
+    need(garage, "List and activate your garage before verifying vouchers")
+    row=x.c.execute("SELECT * FROM reward_redemptions WHERE code=?",(code,)).fetchone()
+    need(row, "Voucher code not found",404)
+    need(row["status"]=="Issued", "This voucher has already been used",409)
+    x.c.execute("UPDATE reward_redemptions SET status='Used',used=?,garage_id=? WHERE id=? AND status='Issued'",(now(),garage["id"],row["id"]))
+    need(x.c.execute("SELECT changes()").fetchone()[0]==1, "This voucher has already been used",409)
+    return dict(ok=True,discount_amount=row["discount_amount"],message="Voucher verified. Apply this discount to the customer's service bill.")
+
+@route("POST", "/api/assistant")
+def vehicle_assistant(x):
+    x.role("customer")
+    question=s(x.body.get("message"),700,"Question")
+    q=question.lower()
+    urgent=any(k in q for k in ["smoke","fire","burning smell","brake failure","brakes failed","steering failed","fuel leak","accident"])
+    if urgent:
+        answer="This may be safety-critical. Stop in a safe place, switch off the vehicle if appropriate, and do not continue driving/riding. Contact roadside assistance or emergency services and arrange a professional inspection."
+        category="Safety first"
+    elif any(k in q for k in ["battery","start","starting","crank","won't start","wont start"]):
+        answer="Possible causes include a weak battery, loose terminals, starter motor or charging-system issue. Check only for obvious loose connections if safe; avoid repeated start attempts. A garage can test the battery and charging system."
+        category="Starting / battery"
+    elif any(k in q for k in ["noise","sound","click","squeak","grinding","vibration"]):
+        answer="A new noise or vibration can come from brakes, tyres, suspension, chain/belt, bearings or engine components. Note when it happens (starting, braking, turning or accelerating). If it is loud, worsening or affects control, stop using the vehicle and get it inspected."
+        category="Noise / vibration"
+    elif any(k in q for k in ["overheat","temperature","hot","coolant"]):
+        answer="Overheating can be caused by low coolant, a leak, radiator fan, thermostat or water-pump issue. Pull over safely and let the engine cool. Never open a hot radiator cap. Arrange an inspection before continuing."
+        category="Overheating"
+    elif any(k in q for k in ["oil","service","maintenance","change"]):
+        answer="Maintenance depends on your vehicle and its manufacturer's schedule. Check the owner's manual and service history for the correct interval and specification. Heeben can help you find a garage for an oil change or routine inspection."
+        category="Maintenance"
+    else:
+        answer="I can help with general vehicle-care guidance. Tell me the vehicle type/model, what you noticed, when it happens, and any warning lights. I can suggest possible areas to check and a suitable service category, but a mechanic must confirm the diagnosis."
+        category="General guidance"
+    return dict(category=category,answer=answer,disclaimer="Heeben Assistant provides general information, not a confirmed diagnosis. A qualified technician should inspect the vehicle.")
+
 @route("GET", "/api/saved")
 def saved(x):
     u = x.auth()
@@ -470,6 +567,9 @@ def set_status(x, id):
     b = x.c.execute("SELECT b.* FROM bookings b JOIN garages g ON g.id=b.garage_id WHERE b.id=? AND g.owner_id=?", (id, u["id"])).fetchone(); need(b, "Booking not found", 404)
     st = x.body.get("status"); need(st in TRANSITIONS.get(b["status"], ()), f"Cannot change a {b['status']} booking to {st}")
     x.c.execute("UPDATE bookings SET status=?, garage_note=?, updated=? WHERE id=?", (st, s(x.body.get("note"), 300, "Note", False), now(), id))
+    if st == "Completed":
+        # Idempotent ledger entry: one reward credit per completed booking.
+        x.c.execute("INSERT OR IGNORE INTO reward_ledger(user_id,booking_id,points,reason,created) VALUES(?,?,10,'Completed service',?)", (b["user_id"], int(id), now()))
     notify_booking_customer(x.c, int(id), "status")
     return dict(ok=True)
 

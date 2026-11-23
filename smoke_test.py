@@ -57,6 +57,9 @@ def main():
             assert call(customer, base, "/api/signup", "POST", {
                 "name": "Customer", "email": "customer@example.test",
                 "password": "StrongPass123", "role": "customer"})[0] == 200
+            status, vehicle = call(customer, base, "/api/vehicles", "POST", {
+                "type": "Car", "model": "Honda City", "reg": "KA01AB1234"})
+            assert status == 200, vehicle
             status, garage = call(owner, base, "/api/garages", "POST", {
                 "name": "Test Garage", "area": "Koramangala, Bengaluru",
                 "phone": "+919876543210", "description": "Test workshop",
@@ -90,9 +93,30 @@ def main():
             status, result = call(customer, base, f"/api/bookings/{booking['id']}/review", "POST",
                                   {"rating": 5, "text": "Great service"})
             assert status == 200, result
+            status, dash = call(customer, base, "/api/dashboard")
+            assert status == 200 and dash["completed"] == 1 and dash["points"] == 10, dash
+            status, history = call(customer, base, "/api/vehicle-history")
+            assert status == 200 and history["history"][0]["records"][0]["service"] == "Routine servicing", history
+            status, rewards = call(customer, base, "/api/rewards")
+            assert status == 200 and rewards["points"] == 10, rewards
+            # Exercise redemption with a funded test balance, then verify single-use at the garage.
+            c = app.db()
+            uid = c.execute("SELECT id FROM users WHERE email='customer@example.test'").fetchone()["id"]
+            c.execute("INSERT INTO reward_ledger(user_id,booking_id,points,reason,created) VALUES(?,NULL,90,'Test reward funding',?)", (uid, app.now()))
+            c.commit(); c.close()
+            status, voucher = call(customer, base, "/api/rewards/redeem", "POST", {"points": 100})
+            assert status == 200 and voucher["discount_amount"] == 50 and voucher["balance"] == 0, voucher
+            status, owner_verify = call(owner, base, "/api/owner/rewards/verify", "POST", {"code": voucher["code"]})
+            assert status == 200 and owner_verify["discount_amount"] == 50, owner_verify
+            status, duplicate = call(owner, base, "/api/owner/rewards/verify", "POST", {"code": voucher["code"]})
+            assert status == 409, duplicate
+            status, rewards = call(customer, base, "/api/rewards")
+            assert status == 200 and rewards["points"] == 0 and rewards["redemptions"][0]["status"] == "Used", rewards
+            status, ai = call(customer, base, "/api/assistant", "POST", {"message": "My scooter makes a clicking noise"})
+            assert status == 200 and "noise" in ai["category"].lower(), ai
             status, page = call(anonymous, base, "/")
             assert status == 200 and "Heeben" in page
-            print("PASS: health check, site page, customer/owner signup, garage listing, booking request, owner acceptance and customer booking history.")
+            print("PASS: core marketplace flow, customer dashboard, vehicle history, rewards earn/redeem/voucher verification and vehicle assistant.")
         finally:
             server.shutdown()
             server.server_close()

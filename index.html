@@ -16,6 +16,8 @@
     <button class="nav-link active" data-view="home">Explore</button>
     <button class="nav-link" data-view="services">Services</button>
     <button class="nav-link" data-view="garages">Find garages</button>
+    <button class="nav-link" data-view="dashboard" id="navDashboard">My dashboard</button>
+    <button class="nav-link" data-view="assistant" id="navAssistant">AI assistant</button>
     <button class="nav-link" data-view="bookings" id="navBookings">My bookings</button>
     <button class="nav-link" data-view="prices">Price guide</button>
     <button class="nav-link" data-view="extras">More care</button>
@@ -145,6 +147,15 @@
   <section class="garage-map-panel" aria-label="Nearby garage map"><div class="map-panel-head"><div><p class="eyebrow">EXPLORE ANYWHERE</p><h2>Find garages by location</h2><p class="hint" id="mapStatus">Search a city, area or PIN code, or use your current location.</p></div><button class="btn btn-outline" id="mapLocateBtn" type="button">◎ Use my location</button></div><div class="map-city-search"><label class="finder-label" for="mapCity">Choose city</label><select id="mapCity" class="city-select" aria-label="Choose city for garage search"></select></div><div class="map-location-search"><input id="mapLocationSearch" type="search" placeholder="Optional area or PIN code — e.g. Koramangala" aria-label="Search garages around a location"><button class="btn btn-navy" id="mapLocationSearchBtn" type="button">Search this location ↗</button></div><div class="map-legend"><span><i class="legend-dot partner"></i> Heeben partners</span><span><i class="legend-dot nearby"></i> Other nearby garages</span><span><i class="legend-dot you"></i> Your location</span></div><div id="garageMap" role="application" aria-label="Map showing Heeben partners and nearby garages"></div><div id="nearbyGarageLinks" class="nearby-garage-links" aria-live="polite"></div><p class="map-footnote">Nearby independent garage data is sourced from OpenStreetMap and may be incomplete. Directions open in Google Maps.</p></section>
   <p class="hint garage-notice" id="garageNotice" hidden>Showing sample garages only: the Heeben server can't be reached from here, so booking and login are unavailable until it is running.</p>
   <p class="hint" id="garageCount" aria-live="polite"></p><div class="garage-grid" id="garageGrid"></div></div>
+</section>
+
+<section class="view" id="dashboard">
+  <div class="page-head compact"><p class="eyebrow">YOUR VEHICLE CARE, IN ONE PLACE</p><h1>My dashboard.</h1><p>Vehicles, service history, bookings and Heeben rewards.</p></div>
+  <div class="section" id="customerDashboardBody"></div>
+</section>
+<section class="view" id="assistant">
+  <div class="page-head compact"><p class="eyebrow">HEEBEN VEHICLE ASSISTANT</p><h1>Let's understand<br><em>your vehicle.</em></h1><p>Describe a symptom or maintenance question and get practical next steps.</p></div>
+  <div class="section"><div class="panel narrow"><div id="assistantReplies" aria-live="polite"><p class="muted">Try: “My scooter makes a clicking noise when I accelerate.”</p></div><form id="assistantForm" class="stack-form"><label class="field">What's happening?<textarea id="assistantQuestion" rows="4" maxlength="700" required placeholder="Describe the symptom, when it happens, and your vehicle model..."></textarea></label><button class="btn btn-navy">Ask Heeben Assistant</button></form><p class="hint">This assistant provides general guidance, not a confirmed diagnosis. For safety-critical symptoms, stop using the vehicle and seek professional help.</p></div></div>
 </section>
 
 <section class="view" id="bookings">

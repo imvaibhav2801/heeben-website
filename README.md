@@ -62,14 +62,15 @@ Example settings are in `.env.example`. For Gmail, use an App Password, not your
 - Back up `/data/heeben.db` regularly. Do not use an ephemeral filesystem for the live SQLite database.
 - Add a dedicated admin/verification workflow, password reset, transactional email provider, automated backups and privacy/legal review before scaling materially.
 
-## Keep the existing Vercel frontend and connect the backend
+## New customer features (this upgrade)
 
-This repository includes `api/[...path].js`, a same-origin Vercel API proxy. The browser continues to call `/api/...`; Vercel forwards those requests to the Python backend, including the login session cookie. This avoids browser cross-origin cookie restrictions.
+- **Customer dashboard** (`/api/dashboard`): saved vehicles, active bookings, completed services, reminders and points summary.
+- **Vehicle history / passport** (`/api/vehicle-history`): service records derived from bookings that use the same saved vehicle model or registration label. Older bookings that do not match a saved vehicle label will not automatically be assigned to it.
+- **Heeben Rewards** (`/api/rewards`): a durable ledger awards 10 points once when a garage marks a booking Completed. Points are currently informational; redemption, cash value and partner-funded discounts are not enabled.
+- **Heeben Vehicle Assistant** (`/api/assistant`): rule-based symptom guidance for common categories (starting/battery, noise/vibration, overheating, maintenance and urgent safety symptoms). It is not a generative AI model or a diagnostic tool. A qualified mechanic must confirm faults.
+- **Garage dashboard**: existing booking, quote and completion workflow remains in place; completion now creates the customer reward entry.
 
-1. Deploy the Python backend as a separate web service and wait for its `/healthz` endpoint to return `ok`.
-2. In Vercel → Project → Settings → Environment Variables, add `HEEBEN_API_URL` with only the backend origin, for example `https://your-service.onrender.com` (no trailing slash and no `/api`).
-3. Apply it to Production (and Preview if needed), save, then redeploy the Vercel project.
-4. Open `https://YOUR-DOMAIN/api/me`. It should return JSON, normally `{"user":null}` when logged out. If it returns a 503, the Vercel environment variable is missing. If it returns a 502, the backend URL/service is unreachable.
-5. Test customer signup, log out, log in, then test a garage-owner signup with a different email.
+The new tables are created automatically on startup. Keep `HEEBEN_DB` on persistent storage (for Render, the mounted `/data` disk and `/data/heeben.db`) before using real customer records. Back up the database regularly.
 
-Important: the Vercel proxy does not create or deploy the backend. The backend must be running first. The current Python backend uses SQLite; do not treat an ephemeral free hosting filesystem as durable production storage. Before accepting real customer bookings, connect persistent database storage or use a host with a persistent disk. Never put passwords or database credentials in frontend code.
+### Heeben Rewards redemption
+Customers earn 10 points when a booking is marked completed. Available vouchers are 100 points = ₹50 off, 200 points = ₹120 off, and 500 points = ₹350 off. Customers redeem from My Dashboard → Heeben Rewards. The single-use voucher code is shown in their account. A garage owner can verify it using the authenticated `POST /api/owner/rewards/verify` endpoint with `{ "code": "HBCODE"`; a successful response returns the discount amount and marks the voucher as Used. The garage applies the discount manually to the service bill. The rewards redemption table is created automatically at server startup; existing points are preserved.

@@ -2,10 +2,14 @@ services:
   - type: web
     name: heeben
     runtime: docker
-    plan: free
+    plan: starter          # a persistent disk needs a paid plan; free plans lose the database on restart
     healthCheckPath: /healthz
     envVars:
       - key: HEEBEN_DEMO
         value: "0"
       - key: HEEBEN_DB
-        value: /tmp/heeben.db
+        value: /data/heeben.db
+    disk:
+      name: heeben-data
+      mountPath: /data
+      sizeGB: 1

@@ -25,7 +25,7 @@ function locationQuery(area) {
   return `${clean}, ${city}, India`;
 }
 initCitySelectors();
-const VIEWS = ['home','services','cart','prices','extras','garages','bookings','account','garage','how','contact','legal'];
+const VIEWS = ['home','services','cart','prices','extras','garages','dashboard','assistant','bookings','account','garage','how','contact','legal'];
 
 /* ---------- API ---------- */
 async function api(path, method = 'GET', body) {
@@ -61,7 +61,7 @@ function show(view) {
   $('#mainNav').classList.remove('open'); $('#mobileMenu').setAttribute('aria-expanded', 'false');
   window.scrollTo({top: 0});
   document.title = (view === 'home' ? '' : view.charAt(0).toUpperCase() + view.slice(1) + ' · ') + 'Heeben — We Care Beyond the Drive';
-  ({home: renderHome, services: renderServices, cart: renderCart, prices: renderPrices, garages: loadGarages, bookings: renderBookings, account: renderAccount, garage: renderGarageDash}[view] || (() => {}))();
+  ({home: renderHome, services: renderServices, cart: renderCart, prices: renderPrices, garages: loadGarages, dashboard: renderCustomerDashboard, assistant: renderAssistant, bookings: renderBookings, account: renderAccount, garage: renderGarageDash}[view] || (() => {}))();
 }
 window.addEventListener('hashchange', () => show(location.hash.slice(1) || 'home'));
 
@@ -85,6 +85,8 @@ function setUser(u) {
   $('#loginBtn').textContent = u ? 'Hi, ' + u.name.split(' ')[0] : 'Log in';
   $('#signupBtn').innerHTML = u ? 'Log out' : 'Sign up <span aria-hidden="true">↗</span>';
   $('#navBookings').style.display = u && u.role === 'owner' ? 'none' : '';
+  $('#navDashboard').style.display = u && u.role === 'customer' ? '' : 'none';
+  $('#navAssistant').style.display = u && u.role === 'customer' ? '' : 'none';
   $('#navGarage').textContent = u && u.role === 'owner' ? 'My garage' : 'For garages';
 }
 $('#authForm').onsubmit = async e => {
@@ -129,6 +131,8 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModals(
 $('#mobileMenu').onclick = () => { const n = $('#mainNav'); const o = n.classList.toggle('open'); $('#mobileMenu').setAttribute('aria-expanded', o); };
 
 const actions = {
+  redeemReward: b => { const pts=Number(b.dataset.points); const offer={100:50,200:120,500:350}[pts]; if(!offer||!confirm(`Redeem ${pts} points for a ₹${offer} service discount voucher?`)) return; guard(b,async()=>{const v=await api('/rewards/redeem','POST',{points:pts});toast(`Voucher created: ${v.code}`);renderCustomerDashboard();}); },
+  copyReward: b => { navigator.clipboard?.writeText(b.dataset.code).then(()=>toast('Voucher code copied.')).catch(()=>toast('Voucher code: '+b.dataset.code)); },
   save: async b => { if (!requireLogin('customer', () => actions.save(b))) return; if (me.role !== 'customer') return toast('Saving garages is for customer accounts.');
     const r = await api('/garages/' + b.dataset.id + '/save', 'POST', {}).catch(fail); if (!r) return; toast(r.saved ? 'Saved to your shortlist.' : 'Removed from your shortlist.'); refreshCurrent(); },
   viewGarage: b => openGarageDetail(b.dataset.id),
@@ -613,6 +617,32 @@ async function renderBookings() {
 }
 function bindGate() { $('#gateLogin').onclick = () => openAuth('login'); $('#gateSignup').onclick = () => openAuth('signup', 'customer'); }
 $('#reviewForm').onsubmit = async e => { e.preventDefault(); try { await api(`/bookings/${$('#reviewBookingId').value}/review`, 'POST', {rating: $('#reviewRating').value, text: $('#reviewText').value}); closeModals(); toast('Thanks for your feedback!'); renderBookings(); } catch (er) { fail(er); } };
+
+/* ---------- customer dashboard, history and rewards ---------- */
+async function renderCustomerDashboard() {
+  const el=$('#customerDashboardBody');
+  if(!me) return gate(el,'Log in to open your dashboard','Your vehicle records and rewards are saved to your account.','<button class="btn btn-navy" id="gateLogin">Log in</button> <button class="btn btn-outline" id="gateSignup">Create account</button>'),bindGate();
+  if(me.role!=='customer') return gate(el,'Customer dashboard','Open your garage dashboard to manage customer bookings.','<button class="btn btn-navy" data-go="garage">Open garage dashboard</button>');
+  el.innerHTML='<p class="muted">Loading your dashboard…</p>';
+  try {
+    const [d,h,r]=await Promise.all([api('/dashboard'),api('/vehicle-history'),api('/rewards')]);
+    el.innerHTML=`<div class="stats"><div><b>${d.vehicles.length}</b><small>Saved vehicles</small></div><div><b>${d.upcoming}</b><small>Active bookings</small></div><div><b>${d.completed}</b><small>Completed services</small></div><div><b>${r.points}</b><small>Heeben points</small></div></div>
+    <div class="dashboard-grid"><div class="stack-col"><div class="panel"><p class="eyebrow">VEHICLE PASSPORT</p><h2>Your vehicle history.</h2>${h.history.length?h.history.map(v=>`<div class="vehicle-row"><span><b>${esc(v.vehicle.model)}</b><small>${esc(v.vehicle.type)}${v.vehicle.reg?' · '+esc(v.vehicle.reg):''}</small></span><b>${v.records.length} records</b></div>${v.records.length?`<div class="booking-list">${v.records.map(b=>`<article class="booking-card"><div><h4>${esc(b.service)}</h4><p>${fmtDate(b.date)} · ${esc(b.garage_name)} · ${esc(b.garage_area)}</p><p>Status: <b>${esc(b.status)}</b>${b.quote_amount?' · Quote: '+money(b.quote_amount):''}</p>${b.health_report?`<p>${esc(b.health_report)}</p>`:''}</div></article>`).join('')}</div>`:'<p class="hint">No service records linked to this vehicle yet. Completed bookings will appear when the booking uses this saved vehicle model.</p>'}`).join(''):'<p class="muted">Add a vehicle in Profile & vehicles to start its passport.</p>'}</div>
+    <div class="panel"><p class="eyebrow">BOOKING SNAPSHOT</p><h2>Recent activity.</h2>${d.bookings.slice(0,5).map(b=>`<div class="vehicle-row"><span><b>${esc(b.service)}</b><small>${esc(b.garage_name)} · ${fmtDate(b.date)}</small></span>${statusPill(b.status)}</div>`).join('')||'<p class="muted">No bookings yet.</p>'}<button class="btn btn-outline" data-view="bookings">View all bookings</button></div></div>
+    <div class="stack-col"><div class="panel"><p class="eyebrow">HEEBEN REWARDS</p><h2>${r.points} points</h2><p class="muted">Earn 10 points for each booking completed through Heeben. Redeem them for service discounts at participating Heeben garages.</p>
+    <div class="reward-offers">${r.offers.map(o=>`<article class="reward-offer"><div><b>${esc(o.label)}</b><small>${o.points} points · ${esc(o.description)}</small></div><button class="btn btn-navy" data-action="redeemReward" data-points="${o.points}" ${r.points<o.points?'disabled':''}>Redeem</button></article>`).join('')}</div>
+    ${r.redemptions.length?`<h3 class="reward-subhead">Your vouchers</h3>${r.redemptions.map(v=>`<div class="vehicle-row reward-voucher"><span><b>${money(v.discount_amount)} service discount</b><small>Code: <strong>${esc(v.code)}</strong> · ${esc(v.status)} · ${fmtDate(v.created.slice(0,10))}</small></span><button class="btn btn-outline" data-action="copyReward" data-code="${esc(v.code)}">Copy code</button></div>`).join('')}<p class="hint">Show an unused voucher to a participating Heeben garage before paying. Each voucher is single-use.</p>`:''}
+    <h3 class="reward-subhead">Points activity</h3>${r.transactions.map(t=>`<div class="vehicle-row"><span><b>${esc(t.reason)}</b><small>${fmtDate(t.created.slice(0,10))}</small></span><b class="${t.points<0?'reward-debit':''}">${t.points>0?'+':''}${t.points}</b></div>`).join('')||'<p class="hint">Your first completed service will earn points.</p>'}</div>
+    <div class="panel"><p class="eyebrow">QUICK ACTIONS</p><div class="btn-row"><button class="btn btn-navy" data-view="garages">Find a garage</button><button class="btn btn-outline" data-view="assistant">Ask vehicle assistant</button><button class="btn btn-outline" data-view="account">Manage vehicles</button></div></div></div></div>`;
+  } catch(e){el.innerHTML=`<p class="muted">${esc(e.message)}</p>`;}
+}
+async function renderAssistant(){
+  const box=$('#assistantReplies');
+  if(!me){box.innerHTML='<p class="muted">Log in to use your personal vehicle assistant.</p><button class="btn btn-navy" id="gateLogin">Log in</button>';$('#gateLogin').onclick=()=>openAuth('login');return;}
+  if(me.role!=='customer'){box.innerHTML='<p class="muted">The vehicle assistant is available to customer accounts.</p>';return;}
+  box.innerHTML='<p class="muted">Describe what you notice. Include your vehicle type/model and when the symptom occurs for more useful guidance.</p>';
+}
+$('#assistantForm').onsubmit=async e=>{e.preventDefault();const q=$('#assistantQuestion').value.trim();if(!q)return;const box=$('#assistantReplies');box.innerHTML='<p class="muted">Thinking…</p>';try{const r=await api('/assistant','POST',{message:q});box.innerHTML=`<div class="panel"><p class="eyebrow">${esc(r.category)}</p><p>${esc(r.answer)}</p><p class="hint">${esc(r.disclaimer)}</p><button class="btn btn-outline" data-view="garages">Find a relevant garage</button></div>`;}catch(er){box.textContent=er.message;}};
 
 /* ---------- account ---------- */
 async function renderAccount() {
