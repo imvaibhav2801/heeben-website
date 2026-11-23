@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#f7f3eb">
+  <title>About the Founder | Heeben</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root{--ink:#171a1f;--navy:#26394d;--blue:#465b72;--muted:#68717b;--line:#e5e1d8;--cream:#f7f3eb;--paper:#fffdf8}
+    *{box-sizing:border-box}
+    body{margin:0;background:#fff;color:var(--ink);font-family:'DM Sans',sans-serif}
+    .founder-page{max-width:1200px;margin:0 auto;padding:0 24px}
+    .founder-hero{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(280px,.8fr);gap:40px;align-items:center;padding:76px clamp(22px,5vw,76px);margin:0 -24px;background:linear-gradient(115deg,#f7f3eb 0%,#edf0f2 100%);border-bottom:1px solid var(--line);overflow:hidden}
+    .founder-copy{max-width:720px}.eyebrow{font-size:10px;font-weight:800;letter-spacing:.18em;color:#657587;margin:0 0 12px}
+    .founder-copy h1{font:800 clamp(42px,5vw,66px)/1.02 'Manrope',sans-serif;letter-spacing:-3px;color:var(--ink);margin:12px 0 18px}
+    .founder-copy h1 em{font-style:normal;color:var(--blue)}
+    .founder-lead{max-width:570px;color:var(--muted);font-size:15px;line-height:1.8}
+    .founder-name-block{display:flex;align-items:center;gap:14px;margin:30px 0 14px}
+    .founder-monogram{display:grid;place-items:center;width:58px;height:58px;flex:0 0 58px;border-radius:18px;background:var(--navy);color:#fff;font:800 17px 'Manrope';letter-spacing:.04em}
+    .founder-name-block h2{font:800 21px 'Manrope';margin:0 0 4px;color:var(--ink)}
+    .founder-name-block p,.founder-education{font-size:12px;color:var(--muted);margin:0}
+    .founder-education{padding-left:72px;line-height:1.7}
+    .founder-art{position:relative;min-height:310px;display:grid;place-items:center;isolation:isolate}
+    .founder-orbit{position:absolute;border:1px solid rgba(70,91,114,.24);border-radius:50%;aspect-ratio:1;width:min(100%,290px)}
+    .orbit-two{width:min(78%,225px);border-style:dashed}
+    .founder-mark{display:grid;place-items:center;width:142px;height:142px;border-radius:42px;background:var(--navy);color:#fff;font:800 68px 'Manrope';box-shadow:0 24px 55px rgba(38,57,77,.18);transform:rotate(-7deg)}
+    .founder-mark span{color:#cbbda6}.founder-art>p{position:absolute;bottom:8px;font-size:9px;letter-spacing:.22em;color:#657587;font-weight:800}
+    .founder-content{display:grid;grid-template-columns:1fr 1fr;gap:18px;padding:48px 0 30px}
+    .founder-story,.founder-vision{padding:28px;background:var(--paper);border:1px solid var(--line);border-radius:16px}
+    .founder-content h2,.founder-contact h2{font:800 clamp(23px,3vw,32px)/1.15 'Manrope';color:var(--ink);letter-spacing:-.8px;margin:8px 0 16px}
+    .founder-content article>p:not(.eyebrow){font-size:13px;line-height:1.85;color:var(--muted)}
+    .founder-tagline{margin-top:20px;padding:17px 18px;background:#f2eee5;border-radius:12px;color:#34495f;font:700 16px 'Manrope'}
+    .founder-contact{display:flex;justify-content:space-between;align-items:center;gap:30px;padding:30px 0 65px;border-top:1px solid var(--line)}
+    .founder-contact .muted{font-size:12px;line-height:1.7;max-width:430px;color:var(--muted)}
+    .founder-contact-links{display:grid;gap:10px;min-width:min(100%,360px)}
+    .founder-contact-links a{display:flex;justify-content:space-between;align-items:center;gap:14px;padding:14px 16px;border:1px solid var(--line);border-radius:11px;background:var(--paper);color:var(--ink);text-decoration:none;font-size:12px;transition:transform .2s,border-color .2s}
+    .founder-contact-links a:hover{transform:translateY(-2px);border-color:#aab5c0}
+    .founder-contact-links a span{font-size:9px;letter-spacing:.12em;color:var(--muted)}.founder-contact-links a b{font-size:11px;overflow-wrap:anywhere}
+    @media(max-width:760px){.founder-hero{grid-template-columns:1fr;padding-top:52px;padding-bottom:35px;gap:12px}.founder-art{min-height:230px}.founder-content{grid-template-columns:1fr;padding-top:28px}.founder-contact{align-items:stretch;flex-direction:column}.founder-contact-links{min-width:0}.founder-copy h1{letter-spacing:-2px}.founder-education{padding-left:0}}
+    @media(max-width:420px){.founder-page{padding:0 16px}.founder-hero{margin:0 -16px;padding-left:24px;padding-right:24px}.founder-story,.founder-vision{padding:22px}.founder-contact-links a{align-items:flex-start;flex-wrap:wrap}}
+  </style>
+</head>
+<body>
+  <main class="founder-page">
+    <section class="founder-hero" aria-labelledby="founder-heading">
+      <div class="founder-copy">
+        <p class="eyebrow">THE PERSON BEHIND HEEBEN</p>
+        <h1 id="founder-heading">Built on an idea.<br><em>Driven by a vision.</em></h1>
+        <p class="founder-lead">A young founder’s journey to make vehicle care simpler, smarter and more accessible.</p>
+        <div class="founder-name-block"><span class="founder-monogram">VA</span><div><h2>Vaibhav Agarwal</h2><p>Founder, Heeben</p></div></div>
+        <p class="founder-education">First-year B.Tech student in Artificial Intelligence and Data Science at IIIT Bangalore.</p>
+      </div>
+      <div class="founder-art" aria-label="Heeben founder profile graphic"><div class="founder-orbit orbit-one"></div><div class="founder-orbit orbit-two"></div><div class="founder-mark">H<span>.</span></div><p>IDEAS INTO IMPACT</p></div>
+    </section>
+    <section class="founder-content" aria-label="About the founder and Heeben's vision">
+      <article class="founder-story"><p class="eyebrow">A LITTLE ABOUT ME</p><h2>Curiosity, technology<br>and the drive to build.</h2><p>I’m Vaibhav, a first-year engineering student with a strong interest in technology, entrepreneurship and building solutions to real-world problems. I believe meaningful businesses begin by understanding everyday challenges and finding better ways to solve them.</p><p>Heeben started with a simple thought: taking care of a vehicle should not feel complicated. Finding the right service, understanding the options and connecting with a dependable service provider should be easier for every vehicle owner.</p></article>
+      <article class="founder-vision"><p class="eyebrow">THE VISION FOR HEEBEN</p><h2>Care that goes beyond the drive.</h2><p>Heeben is being built with the ambition to create a simpler, smarter and more accessible vehicle-care experience. The long-term vision is a connected ecosystem that brings vehicle owners, trusted service providers and useful automotive solutions closer together.</p><p>We’re starting with the essentials, learning from customers and service partners, and improving one step at a time. The goal is to build something useful, dependable and worthy of people’s trust.</p><div class="founder-tagline">“We Care Beyond the Drive.”</div></article>
+    </section>
+    <section class="founder-contact" aria-label="Contact the founder"><div><p class="eyebrow">LET’S CONNECT</p><h2>Ideas grow through conversations.</h2><p class="muted">For questions, collaborations or partnership discussions, feel free to reach out.</p></div><div class="founder-contact-links"><a href="mailto:agarwalvaibhav2801@gmail.com"><span>EMAIL</span><b>agarwalvaibhav2801@gmail.com</b><span aria-hidden="true">↗</span></a><a href="tel:+918669174054"><span>PHONE</span><b>+91 86691 74054</b><span aria-hidden="true">↗</span></a></div></section>
+  </main>
+</body>
+</html>
