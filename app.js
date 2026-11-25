@@ -225,23 +225,59 @@ function safePopup(g, kind) {
   return `<div class="map-popup-title">${name}</div><div class="map-popup-meta">${area} · ${distance}</div>${partnerLabel}<div class="map-popup-actions"><a href="${directions}" target="_blank" rel="noopener">Get directions ↗</a>${phoneLink}</div>`;
 }
 async function fetchNearbyOSMGarages(center) {
-  const radiusKm = Math.min(25, Math.max(1, Number($('#garageRadius')?.value || 10))); 
+  const radiusKm = Math.min(25, Math.max(1, Number($('#garageRadius')?.value || 10)));
   const radius = radiusKm * 1000;
-  const query = `[out:json][timeout:22];(node(around:${radius},${center.lat},${center.lng})["amenity"="car_repair"];way(around:${radius},${center.lat},${center.lng})["amenity"="car_repair"];relation(around:${radius},${center.lat},${center.lng})["amenity"="car_repair"];node(around:${radius},${center.lat},${center.lng})["shop"="car_repair"];way(around:${radius},${center.lat},${center.lng})["shop"="car_repair"];relation(around:${radius},${center.lat},${center.lng})["shop"="car_repair"];node(around:${radius},${center.lat},${center.lng})["craft"="mechanic"];way(around:${radius},${center.lat},${center.lng})["craft"="mechanic"];node(around:${radius},${center.lat},${center.lng})["shop"="motorcycle"];way(around:${radius},${center.lat},${center.lng})["shop"="motorcycle"];node(around:${radius},${center.lat},${center.lng})["amenity"="motorcycle_repair"];way(around:${radius},${center.lat},${center.lng})["amenity"="motorcycle_repair"];);out center tags;`;
-  const controller = new AbortController(), timer = setTimeout(() => controller.abort(), 22000);
-  try {
-    const response = await fetch('https://overpass-api.de/api/interpreter', {method:'POST', body:query, signal:controller.signal, headers:{'Content-Type':'text/plain;charset=UTF-8'}});
-    if (!response.ok) throw new Error('Nearby map data is temporarily unavailable');
-    const data = await response.json();
-    const seen = new Set();
-    return (data.elements || []).map(el => {
-      const lat = el.lat ?? el.center?.lat, lng = el.lon ?? el.center?.lon, tags = el.tags || {};
-      if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
-      const name = tags.name || tags.brand || tags.operator || 'Independent repair garage';
-      const key = `${name.toLowerCase()}|${lat.toFixed(4)}|${lng.toFixed(4)}`; if (seen.has(key)) return null; seen.add(key);
-      return {name, lat, lng, area:[tags['addr:suburb'],tags['addr:city']].filter(Boolean).join(', ') || tags['addr:street'] || 'Nearby area', phone:tags.phone || tags['contact:phone'] || tags['contact:mobile'] || tags.mobile || '', distance_km:Math.round(distanceKm(center.lat,center.lng,lat,lng)*10)/10};
-    }).filter(Boolean).sort((a,b)=>a.distance_km-b.distance_km);
-  } finally { clearTimeout(timer); }
+  // Search broad OSM vehicle-repair categories, not just one exact garage tag.
+  const query = `[out:json][timeout:25];
+(
+  nwr(around:${radius},${center.lat},${center.lng})["amenity"~"^(car_repair|vehicle_inspection|motorcycle_repair)$"];
+  nwr(around:${radius},${center.lat},${center.lng})["shop"~"^(car_repair|motorcycle|motorcycle_repair|vehicle|tyres|tyres_and_batteries)$"];
+  nwr(around:${radius},${center.lat},${center.lng})["craft"="mechanic"];
+  nwr(around:${radius},${center.lat},${center.lng})["service:vehicle:car"="yes"];
+  nwr(around:${radius},${center.lat},${center.lng})["service:vehicle:motorcycle"="yes"];
+);
+out center tags;`;
+  const endpoints = [
+    'https://overpass-api.de/api/interpreter',
+    'https://overpass.kumi.systems/api/interpreter',
+    'https://overpass.private.coffee/api/interpreter'
+  ];
+  let lastError = null, data = null;
+  for (const endpoint of endpoints) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 28000);
+    try {
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        body: 'data=' + encodeURIComponent(query),
+        signal: controller.signal,
+        headers: {'Content-Type':'application/x-www-form-urlencoded;charset=UTF-8'}
+      });
+      if (!response.ok) throw new Error('Map data server returned HTTP ' + response.status);
+      data = await response.json();
+      break;
+    } catch (error) {
+      lastError = error;
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+  if (!data) throw new Error(lastError?.message || 'Nearby garage data is temporarily unavailable');
+  const seen = new Set();
+  return (data.elements || []).map(el => {
+    const lat = Number(el.lat ?? el.center?.lat), lng = Number(el.lon ?? el.center?.lon), tags = el.tags || {};
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+    const name = tags.name || tags.brand || tags.operator || 'Independent vehicle repair shop';
+    const key = `${name.toLowerCase()}|${lat.toFixed(4)}|${lng.toFixed(4)}`;
+    if (seen.has(key)) return null;
+    seen.add(key);
+    return {
+      name, lat, lng,
+      area: [tags['addr:suburb'], tags['addr:city'], tags['addr:street']].filter(Boolean).join(', ') || 'Nearby area',
+      phone: tags.phone || tags['contact:phone'] || tags['contact:mobile'] || tags.mobile || '',
+      distance_km: Math.round(distanceKm(center.lat, center.lng, lat, lng) * 10) / 10
+    };
+  }).filter(Boolean).sort((a,b)=>a.distance_km-b.distance_km);
 }
 function distanceKm(a,b,c,d) { const rad=x=>x*Math.PI/180, dLat=rad(c-a), dLng=rad(d-b), h=Math.sin(dLat/2)**2+Math.cos(rad(a))*Math.cos(rad(c))*Math.sin(dLng/2)**2; return 6371*2*Math.atan2(Math.sqrt(h),Math.sqrt(1-h)); }
 async function renderGarageMap(partners=[]) {
@@ -255,7 +291,8 @@ async function renderGarageMap(partners=[]) {
     try {
       externalGarageCache = await fetchNearbyOSMGarages(userCoords);
     } catch (e) {
-      if (req === mapRequest) $('#mapStatus').textContent = 'Could not load independent garage data right now. Heeben partner locations are still shown.';
+      externalGarageCache = [];
+      if (req === mapRequest) $('#mapStatus').textContent = 'Nearby garage data could not be reached right now. Please try again in a moment. ' + (e?.message || '');
     }
   } else {
     $('#mapStatus').textContent = 'Enter any area, city or PIN code above, or use your current location.';
