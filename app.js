@@ -220,12 +220,14 @@ function safePopup(g, kind) {
   const distance = g.distance_km != null ? `${g.distance_km} km away` : (kind === 'partner' ? 'Heeben-listed garage' : 'Nearby independent garage');
   const directions = mapDirections(g.lat == null ? NaN : Number(g.lat), g.lng == null ? NaN : Number(g.lng), g.name, g.area || g.address);
   const partnerLabel = kind === 'partner' ? '<div class="map-popup-meta">Heeben partner</div>' : '';
-  return `<div class="map-popup-title">${name}</div><div class="map-popup-meta">${area} · ${distance}</div>${partnerLabel}<div class="map-popup-actions"><a href="${directions}" target="_blank" rel="noopener">Get directions ↗</a></div>`;
+  const phone = String(g.phone || '').trim();
+  const phoneLink = phone ? `<a class="secondary" href="tel:${esc(phone).replace(/[^+0-9]/g, '')}">Call ${esc(phone)} ☎</a>` : '<span class="map-popup-meta">Phone number not listed</span>';
+  return `<div class="map-popup-title">${name}</div><div class="map-popup-meta">${area} · ${distance}</div>${partnerLabel}<div class="map-popup-actions"><a href="${directions}" target="_blank" rel="noopener">Get directions ↗</a>${phoneLink}</div>`;
 }
 async function fetchNearbyOSMGarages(center) {
   const radiusKm = Math.min(25, Math.max(1, Number($('#garageRadius')?.value || 10))); 
   const radius = radiusKm * 1000;
-  const query = `[out:json][timeout:18];(node(around:${radius},${center.lat},${center.lng})["amenity"="car_repair"];way(around:${radius},${center.lat},${center.lng})["amenity"="car_repair"];relation(around:${radius},${center.lat},${center.lng})["amenity"="car_repair"];node(around:${radius},${center.lat},${center.lng})["shop"="car_repair"];way(around:${radius},${center.lat},${center.lng})["shop"="car_repair"];node(around:${radius},${center.lat},${center.lng})["craft"="mechanic"];way(around:${radius},${center.lat},${center.lng})["craft"="mechanic"];);out center tags;`;
+  const query = `[out:json][timeout:22];(node(around:${radius},${center.lat},${center.lng})["amenity"="car_repair"];way(around:${radius},${center.lat},${center.lng})["amenity"="car_repair"];relation(around:${radius},${center.lat},${center.lng})["amenity"="car_repair"];node(around:${radius},${center.lat},${center.lng})["shop"="car_repair"];way(around:${radius},${center.lat},${center.lng})["shop"="car_repair"];relation(around:${radius},${center.lat},${center.lng})["shop"="car_repair"];node(around:${radius},${center.lat},${center.lng})["craft"="mechanic"];way(around:${radius},${center.lat},${center.lng})["craft"="mechanic"];node(around:${radius},${center.lat},${center.lng})["shop"="motorcycle"];way(around:${radius},${center.lat},${center.lng})["shop"="motorcycle"];node(around:${radius},${center.lat},${center.lng})["amenity"="motorcycle_repair"];way(around:${radius},${center.lat},${center.lng})["amenity"="motorcycle_repair"];);out center tags;`;
   const controller = new AbortController(), timer = setTimeout(() => controller.abort(), 22000);
   try {
     const response = await fetch('https://overpass-api.de/api/interpreter', {method:'POST', body:query, signal:controller.signal, headers:{'Content-Type':'text/plain;charset=UTF-8'}});
@@ -237,7 +239,7 @@ async function fetchNearbyOSMGarages(center) {
       if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
       const name = tags.name || tags.brand || tags.operator || 'Independent repair garage';
       const key = `${name.toLowerCase()}|${lat.toFixed(4)}|${lng.toFixed(4)}`; if (seen.has(key)) return null; seen.add(key);
-      return {name, lat, lng, area:[tags['addr:suburb'],tags['addr:city']].filter(Boolean).join(', ') || tags['addr:street'] || 'Nearby area', phone:tags.phone || tags['contact:phone'] || '', distance_km:Math.round(distanceKm(center.lat,center.lng,lat,lng)*10)/10};
+      return {name, lat, lng, area:[tags['addr:suburb'],tags['addr:city']].filter(Boolean).join(', ') || tags['addr:street'] || 'Nearby area', phone:tags.phone || tags['contact:phone'] || tags['contact:mobile'] || tags.mobile || '', distance_km:Math.round(distanceKm(center.lat,center.lng,lat,lng)*10)/10};
     }).filter(Boolean).sort((a,b)=>a.distance_km-b.distance_km);
   } finally { clearTimeout(timer); }
 }
@@ -270,7 +272,17 @@ async function renderGarageMap(partners=[]) {
   if (userCoords) $('#mapStatus').textContent = `${partnerCount} mapped Heeben partner${partnerCount===1?'':'s'} and ${externalCount} nearby independent garage${externalCount===1?'':'s'} within the selected search area. ${coordsSource === 'gps' ? 'Based on your current location.' : 'Based on your searched location.'} Select a pin for directions.`;
   else if (partnerCount) $('#mapStatus').textContent = `${partnerCount} Heeben partner locations mapped. Search any area to discover more garages.`;
   const links = $('#nearbyGarageLinks');
-  if (links) links.innerHTML = externalGarageCache.length ? `<h3 class="map-list-title">Other nearby garages</h3>${externalGarageCache.map(g=>`<div class="nearby-garage-row"><span><b>${esc(g.name)}</b><small>${esc(g.area)} · ${g.distance_km} km</small></span><a href="${mapDirections(g.lat,g.lng,g.name,g.area)}" target="_blank" rel="noopener">Directions ↗</a></div>`).join('')}` : '';
+  if (links) {
+    const allMapped = [
+      ...partners.filter(g=>g.lat!=null && g.lng!=null).map(g=>({...g, _kind:'partner'})),
+      ...externalGarageCache.map(g=>({...g, _kind:'nearby'}))
+    ];
+    links.innerHTML = allMapped.length ? `<h3 class="map-list-title">Nearby garages (${allMapped.length})</h3>${allMapped.map(g=>{
+      const phone = String(g.phone || '').trim(), tel = phone.replace(/[^+0-9]/g, '');
+      const distance = g.distance_km != null ? ` · ${g.distance_km} km` : '';
+      return `<div class="nearby-garage-row"><span><b>${esc(g.name)}</b><small>${esc(g.area || g.address || 'Nearby area')}${distance}${g._kind === 'partner' ? ' · Heeben partner' : ''}</small>${phone ? `<small>☎ <a href="tel:${esc(tel)}">${esc(phone)}</a></small>` : '<small>Phone number not listed</small>'}</span><span class="map-row-actions"><a href="${mapDirections(g.lat,g.lng,g.name,g.area || g.address)}" target="_blank" rel="noopener">Directions ↗</a>${phone ? `<a href="tel:${esc(tel)}">Call ↗</a>` : ''}</span></div>`;
+    }).join('')}` : '<p class="hint">No garage locations were found in this search area. Try increasing the search radius.</p>';
+  }
   if (points.length > 1) garageMap.fitBounds(L.featureGroup(points).getBounds().pad(.16),{maxZoom:15});
   else if (points.length === 1) garageMap.setView(points[0].getLatLng(),14);
 }
