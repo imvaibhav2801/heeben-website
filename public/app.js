@@ -227,16 +227,19 @@ function safePopup(g, kind) {
 async function fetchNearbyOSMGarages(center) {
   const radiusKm = Math.min(25, Math.max(1, Number($('#garageRadius')?.value || 10)));
   const radius = radiusKm * 1000;
-  // Search broad OSM vehicle-repair categories, not just one exact garage tag.
-  const query = `[out:json][timeout:25];
+  // Search several common OSM tagging styles. Many independent workshops
+  // are mapped as mechanics, vehicle shops or named garages rather than
+  // using one exact car_repair tag.
+  const query = `[out:json][timeout:45];
 (
-  nwr(around:${radius},${center.lat},${center.lng})["amenity"~"^(car_repair|vehicle_inspection|motorcycle_repair)$"];
-  nwr(around:${radius},${center.lat},${center.lng})["shop"~"^(car_repair|motorcycle|motorcycle_repair|vehicle|tyres|tyres_and_batteries)$"];
+  nwr(around:${radius},${center.lat},${center.lng})["amenity"~"^(car_repair|vehicle_repair|vehicle_inspection|motorcycle_repair)$"];
+  nwr(around:${radius},${center.lat},${center.lng})["shop"~"^(car_repair|vehicle_repair|motorcycle|motorcycle_repair|vehicle|car|tyres|tyres_and_batteries)$"];
   nwr(around:${radius},${center.lat},${center.lng})["craft"="mechanic"];
   nwr(around:${radius},${center.lat},${center.lng})["service:vehicle:car"="yes"];
   nwr(around:${radius},${center.lat},${center.lng})["service:vehicle:motorcycle"="yes"];
+  nwr(around:${radius},${center.lat},${center.lng})["name"~"(garage|motor works|auto works|automobile|car care|bike care|vehicle service|mechanic|tyre|tire)",i];
 );
-out center tags;`;
+out center tags;
   const endpoints = [
     'https://overpass-api.de/api/interpreter',
     'https://overpass.kumi.systems/api/interpreter',
