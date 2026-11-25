@@ -227,31 +227,29 @@ function safePopup(g, kind) {
 async function fetchNearbyOSMGarages(center) {
   const radiusKm = Math.min(25, Math.max(1, Number($('#garageRadius')?.value || 10)));
   const radius = radiusKm * 1000;
-  // Search broad OSM vehicle-repair categories, not just one exact garage tag.
   const query = `[out:json][timeout:25];
 (
-  nwr(around:${radius},${center.lat},${center.lng})["amenity"~"^(car_repair|vehicle_inspection|motorcycle_repair)$"];
-  nwr(around:${radius},${center.lat},${center.lng})["shop"~"^(car_repair|motorcycle|motorcycle_repair|vehicle|tyres|tyres_and_batteries)$"];
-  nwr(around:${radius},${center.lat},${center.lng})["craft"="mechanic"];
+  nwr(around:${radius},${center.lat},${center.lng})["shop"~"^(car_repair|motorcycle_repair|motorcycle|tyres|tyres_and_batteries)$"];
+  nwr(around:${radius},${center.lat},${center.lng})["craft"~"^(mechanic|car_repair)$"];
+  nwr(around:${radius},${center.lat},${center.lng})["amenity"~"^(car_repair|vehicle_inspection|car_wash)$"];
   nwr(around:${radius},${center.lat},${center.lng})["service:vehicle:car"="yes"];
   nwr(around:${radius},${center.lat},${center.lng})["service:vehicle:motorcycle"="yes"];
 );
 out center tags;`;
   const endpoints = [
-    'https://overpass-api.de/api/interpreter',
     'https://overpass.kumi.systems/api/interpreter',
-    'https://overpass.private.coffee/api/interpreter'
+    'https://overpass.private.coffee/api/interpreter',
+    'https://overpass-api.de/api/interpreter'
   ];
   let lastError = null, data = null;
   for (const endpoint of endpoints) {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 28000);
     try {
-      const response = await fetch(endpoint, {
-        method: 'POST',
-        body: 'data=' + encodeURIComponent(query),
+      const response = await fetch(endpoint + '?data=' + encodeURIComponent(query), {
+        method: 'GET',
         signal: controller.signal,
-        headers: {'Content-Type':'application/x-www-form-urlencoded;charset=UTF-8'}
+        headers: {'Accept':'application/json'}
       });
       if (!response.ok) throw new Error('Map data server returned HTTP ' + response.status);
       data = await response.json();
@@ -299,6 +297,7 @@ async function renderGarageMap(partners=[]) {
     externalGarageCache = [];
   }
   if (req !== mapRequest) return;
+  const lookupFailed = !!($('#mapStatus')?.textContent.includes('could not be reached'));
   partners.filter(g=>g.lat!=null && g.lng!=null).forEach(g=>{
     const m=L.marker([Number(g.lat),Number(g.lng)],{icon:pinIcon('partner')}).bindPopup(safePopup(g,'partner')).addTo(garageMapLayer); points.push(m);
   });
@@ -306,7 +305,7 @@ async function renderGarageMap(partners=[]) {
     const m=L.marker([g.lat,g.lng],{icon:pinIcon('nearby')}).bindPopup(safePopup(g,'nearby')).addTo(garageMapLayer); points.push(m);
   });
   const externalCount=externalGarageCache.length, partnerCount=partners.filter(g=>g.lat!=null&&g.lng!=null).length;
-  if (userCoords) $('#mapStatus').textContent = `${partnerCount} mapped Heeben partner${partnerCount===1?'':'s'} and ${externalCount} nearby independent garage${externalCount===1?'':'s'} within the selected search area. ${coordsSource === 'gps' ? 'Based on your current location.' : 'Based on your searched location.'} Select a pin for directions.`;
+  if (userCoords && !lookupFailed) $('#mapStatus').textContent = `${partnerCount} mapped Heeben partner${partnerCount===1?'':'s'} and ${externalCount} nearby independent garage${externalCount===1?'':'s'} within the selected search area. ${coordsSource === 'gps' ? 'Based on your current location.' : 'Based on your searched location.'} Select a pin for directions.`;
   else if (partnerCount) $('#mapStatus').textContent = `${partnerCount} Heeben partner locations mapped. Search any area to discover more garages.`;
   const links = $('#nearbyGarageLinks');
   if (links) {
