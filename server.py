@@ -57,7 +57,7 @@ CREATE TABLE IF NOT EXISTS garages(id INTEGER PRIMARY KEY, owner_id INTEGER NOT 
 CREATE TABLE IF NOT EXISTS garage_services(garage_id INTEGER NOT NULL REFERENCES garages(id) ON DELETE CASCADE,
   service TEXT NOT NULL, price INTEGER NOT NULL, PRIMARY KEY(garage_id, service));
 CREATE TABLE IF NOT EXISTS vehicles(id INTEGER PRIMARY KEY, user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  type TEXT NOT NULL, model TEXT NOT NULL, reg TEXT DEFAULT '');
+  type TEXT NOT NULL, model TEXT NOT NULL, reg TEXT DEFAULT '', make TEXT DEFAULT '', year INTEGER, fuel TEXT DEFAULT '', odometer INTEGER DEFAULT 0);
 CREATE TABLE IF NOT EXISTS bookings(id INTEGER PRIMARY KEY, user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   garage_id INTEGER NOT NULL REFERENCES garages(id) ON DELETE CASCADE, service TEXT NOT NULL, vehicle TEXT NOT NULL,
   date TEXT NOT NULL, time TEXT NOT NULL, mode TEXT NOT NULL, notes TEXT DEFAULT '', contact_phone TEXT DEFAULT '',
@@ -383,13 +383,28 @@ def my_garages(x):
 
 # --- vehicles / reminders / saved ---
 @route("GET", "/api/vehicles")
-def vehicles(x): return dict(vehicles=[dict(r) for r in x.c.execute("SELECT id,type,model,reg FROM vehicles WHERE user_id=?", (x.auth()["id"],))])
+def vehicles(x):
+    return dict(vehicles=[dict(r) for r in x.c.execute(
+        "SELECT id,type,model,reg,make,year,fuel,odometer FROM vehicles WHERE user_id=? ORDER BY id DESC",
+        (x.auth()["id"],))])
 
 @route("POST", "/api/vehicles")
 def add_vehicle(x):
     u = x.auth(); t = x.body.get("type"); need(t in VEHICLES, "Choose a vehicle type")
     need(x.c.execute("SELECT COUNT(*) FROM vehicles WHERE user_id=?", (u["id"],)).fetchone()[0] < 20, "Vehicle limit reached")
-    x.c.execute("INSERT INTO vehicles(user_id,type,model,reg) VALUES(?,?,?,?)", (u["id"], t, s(x.body.get("model"), 60, "Vehicle model"), s(x.body.get("reg"), 20, "Registration", False).upper()))
+    model = s(x.body.get("model"), 60, "Vehicle model")
+    make = s(x.body.get("make"), 40, "Vehicle make", False)
+    reg = s(x.body.get("reg"), 20, "Registration", False).upper()
+    fuel = s(x.body.get("fuel"), 24, "Fuel type", False)
+    year_raw = x.body.get("year")
+    try: year = int(year_raw) if year_raw not in (None, "") else None
+    except (TypeError, ValueError): year = None
+    need(year is None or 1950 <= year <= datetime.now().year + 1, "Enter a valid manufacturing year")
+    try: odometer = int(x.body.get("odometer") or 0)
+    except (TypeError, ValueError): odometer = -1
+    need(0 <= odometer <= 2000000, "Enter a valid odometer reading")
+    x.c.execute("""INSERT INTO vehicles(user_id,type,model,reg,make,year,fuel,odometer)
+                   VALUES(?,?,?,?,?,?,?,?)""", (u["id"], t, model, reg, make, year, fuel, odometer))
     return dict(ok=True)
 
 @route("DELETE", "/api/vehicles/<id>")
@@ -412,7 +427,7 @@ def del_reminder(x, id): x.c.execute("DELETE FROM reminders WHERE id=? AND user_
 def customer_dashboard(x):
     u = x.role("customer")
     bookings = [booking_dict(x.c, b) for b in x.c.execute("SELECT * FROM bookings WHERE user_id=? ORDER BY date DESC,id DESC", (u["id"],))]
-    vehicles = [dict(r) for r in x.c.execute("SELECT id,type,model,reg FROM vehicles WHERE user_id=? ORDER BY id DESC", (u["id"],))]
+    vehicles = [dict(r) for r in x.c.execute("SELECT id,type,model,reg,make,year,fuel,odometer FROM vehicles WHERE user_id=? ORDER BY id DESC", (u["id"],))]
     points = x.c.execute("SELECT COALESCE(SUM(points),0) n FROM reward_ledger WHERE user_id=?", (u["id"],)).fetchone()["n"]
     return dict(vehicles=vehicles, bookings=bookings, points=points,
       upcoming=sum(1 for b in bookings if b["status"] in ("Requested","Confirmed") and b["date"] >= date.today().isoformat()),
@@ -620,6 +635,9 @@ def init_db():
     Path(DB_PATH).parent.mkdir(parents=True, exist_ok=True)
     c = db(); c.executescript(SCHEMA)
     # Backward-compatible migration for databases created before booking price snapshots.
+    vehicle_cols = {r["name"] for r in c.execute("PRAGMA table_info(vehicles)")}
+    for col, definition in [("make", "TEXT DEFAULT ''"), ("year", "INTEGER"), ("fuel", "TEXT DEFAULT ''"), ("odometer", "INTEGER DEFAULT 0")]:
+        if col not in vehicle_cols: c.execute(f"ALTER TABLE vehicles ADD COLUMN {col} {definition}")
     booking_cols = {r["name"] for r in c.execute("PRAGMA table_info(bookings)")}
     if "estimated_price" not in booking_cols:
         c.execute("ALTER TABLE bookings ADD COLUMN estimated_price INTEGER NOT NULL DEFAULT 0")
